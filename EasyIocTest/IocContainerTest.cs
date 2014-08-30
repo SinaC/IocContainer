@@ -25,6 +25,35 @@ namespace EasyIocTest
         }
 
         [TestMethod]
+        public void TestReset()
+        {
+            IocContainer.Default.Reset();
+            IocContainer.Default.Register<ITestInterface1, TestClass1ImplementingInterface1>();
+            IocContainer.Default.Register<ITestInterface2, TestClass1ImplementingInterface2>();
+
+            IocContainer.Default.Reset();
+            try
+            {
+                IocContainer.Default.Resolve<ITestInterface1>();
+
+                Assert.Fail("Exception not thrown");
+            }
+            catch (ArgumentException)
+            {
+            }
+
+            try
+            {
+                IocContainer.Default.Resolve<ITestInterface2>();
+
+                Assert.Fail("Exception not thrown");
+            }
+            catch (ArgumentException)
+            {
+            }
+        }
+
+        [TestMethod]
         public void TestSuccessfulRegistrationNoCreator()
         {
             IocContainer.Default.Reset();
@@ -49,7 +78,7 @@ namespace EasyIocTest
         }
 
         [TestMethod]
-        public void Test2DifferentRegistrationsOnSameInterface()
+        public void TestRegister2DifferentRegistrationsOnSameInterface()
         {
             IocContainer.Default.Reset();
             IocContainer.Default.Register<ITestInterface1, TestClass1ImplementingInterface1>();
@@ -67,7 +96,7 @@ namespace EasyIocTest
         }
 
         [TestMethod]
-        public void Test2IdenticalRegistrationsOnSameInterface()
+        public void TestRegister2IdenticalRegistrationsOnSameInterface()
         {
             IocContainer.Default.Reset();
             IocContainer.Default.Register<ITestInterface1, TestClass1ImplementingInterface1>();
@@ -80,7 +109,7 @@ namespace EasyIocTest
         }
 
         [TestMethod]
-        public void TestRegistrationOnNonInterface()
+        public void TestRegisterOnNonInterface()
         {
             IocContainer.Default.Reset();
             try
@@ -96,7 +125,7 @@ namespace EasyIocTest
         }
 
         [TestMethod]
-        public void TestRegistrationOnAbstractClass()
+        public void TestRegisterOnAbstractClass()
         {
             IocContainer.Default.Reset();
             try
@@ -112,7 +141,7 @@ namespace EasyIocTest
         }
 
         [TestMethod]
-        public void TestRegistrationInterfaceAsImplementation()
+        public void TestRegisterInterfaceAsImplementation()
         {
             IocContainer.Default.Reset();
             try
@@ -128,7 +157,7 @@ namespace EasyIocTest
         }
 
         [TestMethod]
-        public void TestRegistrationNotAssignable()
+        public void TestRegisterNotAssignable()
         {
             IocContainer.Default.Reset();
             try
@@ -163,6 +192,62 @@ namespace EasyIocTest
             bool isRegistered = IocContainer.Default.IsRegistered<ITestInterface1>();
 
             Assert.IsTrue(isRegistered);
+        }
+
+        [TestMethod]
+        public void TestResolveSingleInstance()
+        {
+            IocContainer.Default.Reset();
+            IocContainer.Default.Register<ITestInterface1, TestClass1ImplementingInterface1>();
+
+            ITestInterface1 instance1 = IocContainer.Default.Resolve<ITestInterface1>();
+            ITestInterface1 instance2 = IocContainer.Default.Resolve<ITestInterface1>();
+
+            Assert.AreEqual(instance1, instance2);
+        }
+
+        [TestMethod]
+        public void TestUnregisterExceptionOnNonRegisteredInterface()
+        {
+            IocContainer.Default.Reset();
+            IocContainer.Default.Register<ITestInterface1, TestClass1ImplementingInterface1>();
+
+            try
+            {
+                IocContainer.Default.Unregister<ITestInterface2>();
+
+                Assert.Fail("Exception not thrown");
+            }
+            catch (ArgumentException)
+            {
+            }
+        }
+
+        [TestMethod]
+        public void TestUnregisterNoExceptionOnRegisteredInterface()
+        {
+            IocContainer.Default.Reset();
+            IocContainer.Default.Register<ITestInterface1, TestClass1ImplementingInterface1>();
+
+            IocContainer.Default.Unregister<ITestInterface1>();
+        }
+
+        [TestMethod]
+        public void TestUnregisterNoRegistrationFound()
+        {
+            IocContainer.Default.Reset();
+            IocContainer.Default.Register<ITestInterface1, TestClass1ImplementingInterface1>();
+
+            IocContainer.Default.Unregister<ITestInterface1>();
+            try
+            {
+                IocContainer.Default.Resolve<ITestInterface1>();
+
+                Assert.Fail("No exception thrown");
+            }
+            catch (ArgumentException)
+            {
+            }
         }
     }
 

@@ -5,13 +5,17 @@ using System.Reflection;
 
 namespace EasyIoc
 {
-    // TODO: thread-safe API, recursive resolve on ctor parameters
+    // TODO: recursive resolve on ctor parameters
     // questions: which ctor should be choosed if multiple ctor?
     public class IocContainer : IIocContainer
     {
+        private static readonly Type NoImplementationType = null;
+
         private readonly Dictionary<Type, Type> _interfaceToImplementationMap = new Dictionary<Type, Type>();
         private readonly Dictionary<Type, object> _instanceRegistry = new Dictionary<Type, object>();
         private readonly Dictionary<Type, Func<object>> _createInstanceFunc = new Dictionary<Type, Func<object>>();
+
+        private readonly object _lockObject = new object();
 
         private static IocContainer _default;
 
@@ -47,20 +51,8 @@ namespace EasyIoc
             if (!interfaceType.IsAssignableFrom(implementationType))
                 throw new ArgumentException(String.Format("{0} is not assignable from {1}", interfaceType.FullName, implementationType.FullName));
 
-            if (_interfaceToImplementationMap.ContainsKey(interfaceType))
-            {
-                if (_interfaceToImplementationMap[interfaceType] != implementationType)
-                    throw new InvalidOperationException(String.Format("There is already a class registered for interface {0}", interfaceType.FullName));
-            }
-            else
-                _interfaceToImplementationMap.Add(interfaceType, implementationType);
-            
-            // Create object creator func if needed
-            if (!_createInstanceFunc.ContainsKey(interfaceType))
-            {
-                Func<object> creator = CreateObjectFunc(implementationType);
-                _createInstanceFunc.Add(interfaceType, creator);
-            }
+            lock (_lockObject)
+                InternalRegister(interfaceType, implementationType, () => CreateObjectFunc(implementationType));
         }
 
         public void Register<TInterface>(Func<TInterface> createFunc)
@@ -74,13 +66,8 @@ namespace EasyIoc
             if (!interfaceType.IsInterface)
                 throw new ArgumentException("Only an interface can be registered");
 
-            if (_createInstanceFunc.ContainsKey(interfaceType))
-            {
-                if (_createInstanceFunc[interfaceType] != createFunc)
-                    throw new ArgumentException(String.Format("There is already a function registered for interface {0}", interfaceType.FullName));
-            }
-            else
-                _createInstanceFunc.Add(interfaceType, createFunc);
+            lock (_lockObject)
+                InternalRegister(interfaceType, NoImplementationType, () => createFunc);
         }
 
         public void Unregister<TInterface>()
@@ -88,9 +75,15 @@ namespace EasyIoc
         {
             Type interfaceType = typeof(TInterface);
 
-            _interfaceToImplementationMap.Remove(interfaceType);
-            _instanceRegistry.Remove(interfaceType);
-            _createInstanceFunc.Remove(interfaceType);
+            lock (_lockObject)
+            {
+                if (!_interfaceToImplementationMap.ContainsKey(interfaceType))
+                    throw new ArgumentException("Cannot Unregister: No registration found for interface {0}", interfaceType.FullName);
+
+                _interfaceToImplementationMap.Remove(interfaceType);
+                _instanceRegistry.Remove(interfaceType);
+                _createInstanceFunc.Remove(interfaceType);
+            }
         }
 
         public TInterface Resolve<TInterface>()
@@ -101,35 +94,42 @@ namespace EasyIoc
             if (!interfaceType.IsInterface)
                 throw new ArgumentException("Only an interface can be resolved");
 
-            if (!_createInstanceFunc.ContainsKey(interfaceType))
-                throw new ArgumentException(String.Format("Cannot Resolve: No registration found for interface {0}", interfaceType.FullName));
-
             object resolved = null;
-            // Check if instance already created
-            if (_instanceRegistry.ContainsKey(interfaceType))
-                resolved = _instanceRegistry[interfaceType];
-
-            // If no instance found, create one
-            if (resolved == null)
+            lock (_lockObject)
             {
-                Func<object> creator = _createInstanceFunc[interfaceType];
+                if (!_createInstanceFunc.ContainsKey(interfaceType))
+                    throw new ArgumentException(String.Format("Cannot Resolve: No registration found for interface {0}", interfaceType.FullName));
 
-                resolved = creator();
+                // Check if instance already created
+                if (_instanceRegistry.ContainsKey(interfaceType))
+                    resolved = _instanceRegistry[interfaceType];
 
-                if (!_instanceRegistry.ContainsKey(interfaceType))
-                    _instanceRegistry.Add(interfaceType, resolved);
+                // If no instance found, create one
+                if (resolved == null)
+                {
+                    Func<object> creator = _createInstanceFunc[interfaceType];
+
+                    resolved = creator.DynamicInvoke(null);
+
+                    if (!_instanceRegistry.ContainsKey(interfaceType))
+                        _instanceRegistry.Add(interfaceType, resolved);
+                }
             }
             return (TInterface) resolved;
         }
 
         public void Reset()
         {
-            _interfaceToImplementationMap.Clear();
-            _instanceRegistry.Clear();
-            _createInstanceFunc.Clear();
+            lock (_lockObject)
+            {
+                _interfaceToImplementationMap.Clear();
+                _instanceRegistry.Clear();
+                _createInstanceFunc.Clear();
+            }
         }
 
-        private Func<object> CreateObjectFunc(Type implementationType)
+        // Following methods are not responsible for sync-locking, this must be done by caller
+        private static Func<object> CreateObjectFunc(Type implementationType)
         {
             ConstructorInfo[] constructorInfos = implementationType.GetConstructors();
 
@@ -147,6 +147,23 @@ namespace EasyIoc
                 throw new Exception(String.Format("Cannot Resolve: No parameterless constructor found"));
 
             return () => constructor.Invoke(null);
+        }
+
+        private void InternalRegister(Type interfaceType, Type implementationType, Func<Func<object>> createCreatorFunc)
+        {
+            if (_interfaceToImplementationMap.ContainsKey(interfaceType))
+            {
+                if (_interfaceToImplementationMap[interfaceType] != implementationType)
+                    throw new InvalidOperationException(String.Format("There is already a class/function registered for interface {0}", interfaceType.FullName));
+            }
+            else
+                _interfaceToImplementationMap.Add(interfaceType, implementationType);
+
+            if (!_createInstanceFunc.ContainsKey(interfaceType))
+            {
+                Func<object> creator = createCreatorFunc.Invoke();
+                _createInstanceFunc.Add(interfaceType, creator);
+            }
         }
     }
 }
