@@ -1,5 +1,4 @@
 D:\GitHub\IocContainer\EasyIoc\bin\Debug\EasyIoc.dll
 D:\GitHub\IocContainer\EasyIoc\bin\Debug\EasyIoc.pdb
-D:\GitHub\IocContainer\EasyIoc\obj\Debug\EasyIoc.csprojResolveAssemblyReference.cache
 D:\GitHub\IocContainer\EasyIoc\obj\Debug\EasyIoc.dll
 D:\GitHub\IocContainer\EasyIoc\obj\Debug\EasyIoc.pdb

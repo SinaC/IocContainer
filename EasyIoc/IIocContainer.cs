@@ -17,7 +17,7 @@ namespace EasyIoc
         void Unregister<TInterface>()
             where TInterface : class;
 
-        TInterface Resolve<TInterface>(bool newInstance = true)
+        TInterface Resolve<TInterface>()
             where TInterface : class;
 
         void Reset();

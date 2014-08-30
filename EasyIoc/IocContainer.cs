@@ -5,6 +5,8 @@ using System.Reflection;
 
 namespace EasyIoc
 {
+    // TODO: thread-safe API, recursive resolve on ctor parameters
+    // questions: which ctor should be choosed if multiple ctor?
     public class IocContainer : IIocContainer
     {
         private readonly Dictionary<Type, Type> _interfaceToImplementationMap = new Dictionary<Type, Type>();
@@ -84,10 +86,14 @@ namespace EasyIoc
         public void Unregister<TInterface>()
             where TInterface : class
         {
-            throw new NotImplementedException();
+            Type interfaceType = typeof(TInterface);
+
+            _interfaceToImplementationMap.Remove(interfaceType);
+            _instanceRegistry.Remove(interfaceType);
+            _createInstanceFunc.Remove(interfaceType);
         }
 
-        public TInterface Resolve<TInterface>(bool newInstance = true)
+        public TInterface Resolve<TInterface>()
             where TInterface : class
         {
             Type interfaceType = typeof (TInterface);
@@ -99,13 +105,9 @@ namespace EasyIoc
                 throw new ArgumentException(String.Format("Cannot Resolve: No registration found for interface {0}", interfaceType.FullName));
 
             object resolved = null;
-            // Get already created instance if asked
-            if (!newInstance)
-            {
-                // Check if instance already created
-                if (_instanceRegistry.ContainsKey(interfaceType))
-                    resolved = _instanceRegistry[interfaceType];
-            }
+            // Check if instance already created
+            if (_instanceRegistry.ContainsKey(interfaceType))
+                resolved = _instanceRegistry[interfaceType];
 
             // If no instance found, create one
             if (resolved == null)
