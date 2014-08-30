@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyIoc", "EasyIoc\EasyIoc.csproj", "{38D20E7F-9510-4B80-8755-1DEF2EF07BCF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyIocTest", "EasyIocTest\EasyIocTest.csproj", "{6B41B4BB-DEAD-44ED-AA65-783A8BDC3B6C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{38D20E7F-9510-4B80-8755-1DEF2EF07BCF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{38D20E7F-9510-4B80-8755-1DEF2EF07BCF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{38D20E7F-9510-4B80-8755-1DEF2EF07BCF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{38D20E7F-9510-4B80-8755-1DEF2EF07BCF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6B41B4BB-DEAD-44ED-AA65-783A8BDC3B6C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6B41B4BB-DEAD-44ED-AA65-783A8BDC3B6C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6B41B4BB-DEAD-44ED-AA65-783A8BDC3B6C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6B41B4BB-DEAD-44ED-AA65-783A8BDC3B6C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

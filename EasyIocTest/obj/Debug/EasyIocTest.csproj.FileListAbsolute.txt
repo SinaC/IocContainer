@@ -1,0 +1,7 @@
+D:\GitHub\IocContainer\EasyIocTest\bin\Debug\EasyIocTest.dll
+D:\GitHub\IocContainer\EasyIocTest\bin\Debug\EasyIocTest.pdb
+D:\GitHub\IocContainer\EasyIocTest\obj\Debug\EasyIocTest.csprojResolveAssemblyReference.cache
+D:\GitHub\IocContainer\EasyIocTest\obj\Debug\EasyIocTest.dll
+D:\GitHub\IocContainer\EasyIocTest\obj\Debug\EasyIocTest.pdb
+D:\GitHub\IocContainer\EasyIocTest\bin\Debug\EasyIoc.dll
+D:\GitHub\IocContainer\EasyIocTest\bin\Debug\EasyIoc.pdb
