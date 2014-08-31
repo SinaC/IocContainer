@@ -34,6 +34,13 @@
     {
     }
 
+    public class TestClass6ImplementatingInterface1 : ITestInterface1
+    {
+        public TestClass6ImplementatingInterface1(ITestInterface2 interface2)
+        {
+        }
+    }
+
     public interface ITestInterface2
     {
     }
