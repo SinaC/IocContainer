@@ -12,7 +12,6 @@ namespace EasyIoc
         private readonly Dictionary<Type, Type> _interfaceToImplementationMap = new Dictionary<Type, Type>();
         private readonly Dictionary<Type, Func<object>> _factories = new Dictionary<Type, Func<object>>();
         private readonly Dictionary<Type, object> _instances = new Dictionary<Type, object>();
-        private readonly Dictionary<Type, ConstructorInfo[]> _constructorInfos = new Dictionary<Type, ConstructorInfo[]>(); // TODO: use this in CreateFactory
 
         private readonly object _lockObject = new object();
 
@@ -65,8 +64,6 @@ namespace EasyIoc
                 }
                 else
                     _interfaceToImplementationMap.Add(interfaceType, implementationType);
-
-                _constructorInfos.Add(interfaceType, implementationType.GetConstructors());
             }
         }
 
@@ -181,20 +178,7 @@ namespace EasyIoc
         }
 
         #endregion
-
-        // Test method only accessible from IocContainer instance
-        public ConstructorInfo Test<TInterface>()
-        {
-            Type interfaceType = typeof (TInterface);
-
-            if (!_interfaceToImplementationMap.ContainsKey(interfaceType))
-                return null;
-
-            Type implementationType = _interfaceToImplementationMap[interfaceType];
-
-            return GetCreatableConstructor(implementationType);
-        }
-
+        
         // Following methods are responsible for locking collections, it's the caller responsability
         private static Func<object> CreateFactory(Type implementationType)
         {
@@ -208,14 +192,68 @@ namespace EasyIoc
 
             // TODO: get first parameterless ctor
             ConstructorInfo constructor = constructorInfos.FirstOrDefault(x => x.GetParameters().Length == 0);
-            
+
             if (constructor == null)
                 throw new ArgumentException(String.Format("Cannot Create Instance: No parameterless constructor found in {0}.", implementationType.Name));
 
             return (() => constructor.Invoke(null));
         }
 
-        // Under construction
+        #region Under construction
+
+        // Test method only accessible from IocContainer instance
+        public TInterface Test<TInterface>()
+            where TInterface:class
+        {
+            Type interfaceType = typeof (TInterface);
+
+            if (!_interfaceToImplementationMap.ContainsKey(interfaceType))
+                return null; // TODO: throw exception
+
+            Type implementationType = _interfaceToImplementationMap[interfaceType];
+
+            ConstructorInfo constructorInfo = GetCreatableConstructor(implementationType);
+            if (constructorInfo == null)
+                return null; // TODO: throw exception
+
+            Dictionary<Type, object> instances = _instances.Select(x => x).ToDictionary(x => x.Key, x => x.Value);
+            object instance = CreateInstance(constructorInfo, instances);
+            return (TInterface)instance;
+        }
+
+        // !!! recursive ctor
+        private object CreateInstance(ConstructorInfo constructor, Dictionary<Type, object> instances)
+        {
+            ParameterInfo[] parametersInfo = constructor.GetParameters();
+            if (parametersInfo.Length == 0)
+                return constructor.Invoke(null);
+
+            object[] parameters = new object[parametersInfo.Length];
+            for (int i = 0; i < parametersInfo.Length; i++)
+            {
+                if (instances.ContainsKey(parametersInfo[i].ParameterType))
+                    parameters[i] = instances[parametersInfo[i].ParameterType];
+                else
+                {
+                    object parameterInstance;
+                    if (_factories.ContainsKey(parametersInfo[i].ParameterType))
+                    {
+                        Func<object> factory = _factories[parametersInfo[i].ParameterType];
+                        parameterInstance = factory.DynamicInvoke(null);
+                    }
+                    else
+                    {
+                        Type parameterImplementationType = _interfaceToImplementationMap[parametersInfo[i].ParameterType];
+                        ConstructorInfo parameterConstructorInfo = GetCreatableConstructor(parameterImplementationType);
+                        parameterInstance = CreateInstance(parameterConstructorInfo, instances);
+                    }
+                    instances.Add(parametersInfo[i].ParameterType, parameterInstance);
+                    parameters[i] = parameterInstance;
+                }
+            }
+            return constructor.Invoke(parameters);
+        }
+
         private ConstructorInfo GetCreatableConstructor(Type type)
         {
             ConstructorInfo[] constructorInfos = type.GetConstructors();
@@ -267,5 +305,7 @@ namespace EasyIoc
 
             return null;
         }
+
+        #endregion
     }
 }
