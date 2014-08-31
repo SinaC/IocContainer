@@ -2,66 +2,80 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using System.Threading.Tasks;
+
+// TODO: continue Resolve + UnitTests
 
 namespace EasyIoc
 {
-    // TODO: major modifications, remove ResolveMethods
-    //  by default, Resolve returns a new instance
-    //  if an instance has been registered via Register, Resolve returns that instance
-    //  rename Register<,> to RegisterType
-    //  rename Register(instance) to RegisterInstance
-
-    // TODO: recursive resolve on ctor parameters
-    // questions: which ctor should be choosed if multiple ctor?
     public class IocContainer : IIocContainer
     {
-        private static readonly Type NoImplementationType = null;
-
-        private readonly Dictionary<Type, Type> _interfaceToImplementationMap = new Dictionary<Type, Type>();
-        private readonly Dictionary<Type, object> _instanceRegistry = new Dictionary<Type, object>();
-        private readonly Dictionary<Type, Func<object>> _createInstanceFunc = new Dictionary<Type, Func<object>>();
+        private readonly Dictionary<Type, Type> _typeMaps = new Dictionary<Type, Type>();
+        private readonly Dictionary<Type, Func<object>> _factories = new Dictionary<Type, Func<object>>();
+        private readonly Dictionary<Type, object> _instances = new Dictionary<Type, object>();
 
         private readonly object _lockObject = new object();
 
-        private static IocContainer _default;
-
-        public static IIocContainer Default
+        private static readonly Lazy<IocContainer> LazyDefault = new Lazy<IocContainer>(() => new IocContainer());
+        public static IocContainer Default
         {
             get
             {
-                return _default ?? (_default = new IocContainer());
+                return LazyDefault.Value;
             }
         }
+
+        #region IIocContainer
 
         public bool IsRegistered<TInterface>()
             where TInterface : class
         {
             Type interfaceType = typeof (TInterface);
-            return _interfaceToImplementationMap.ContainsKey(interfaceType);
+            bool found = false;
+            lock (_lockObject)
+            {
+                found = _typeMaps.ContainsKey(interfaceType);
+            }
+            return found;
         }
 
-        public void Register<TInterface, TImplementation>()
-            where TInterface : class
+        public void RegisterType<TInterface, TImplementation>() 
+            where TInterface : class 
             where TImplementation : class
         {
-            Type interfaceType = typeof (TInterface);
+            Type interfaceType = typeof(TInterface);
 
             if (!interfaceType.IsInterface)
-                throw new ArgumentException("Only an interface can be registered");
+                throw new ArgumentException("Cannot Register: Only an interface can be registered");
 
-            Type implementationType = typeof (TImplementation);
+            Type implementationType = typeof(TImplementation);
 
             if (implementationType.IsInterface || implementationType.IsAbstract)
-                throw new ArgumentException("Cannot register an interface or an abstract class");
+                throw new ArgumentException("Cannot Register: No interface or abstract class is  valid as implementation");
 
             if (!interfaceType.IsAssignableFrom(implementationType))
                 throw new ArgumentException(String.Format("{0} is not assignable from {1}", interfaceType.FullName, implementationType.FullName));
 
             lock (_lockObject)
-                InternalRegister(interfaceType, implementationType, () => CreateObjectFunc(implementationType));
+            {
+                if (_typeMaps.ContainsKey(interfaceType))
+                {
+                    if (_typeMaps[interfaceType] != implementationType)
+                        throw new InvalidOperationException(String.Format("There is already an implementation registered for interface {0}", interfaceType.FullName));
+                }
+                else
+                    _typeMaps.Add(interfaceType, implementationType);
+
+                if (!_factories.ContainsKey(interfaceType))
+                {
+                    Func<object> creator = CreateFactory(implementationType);
+                    _factories.Add(interfaceType, creator);
+                }
+            }
         }
 
-        public void Register<TInterface>(Func<TInterface> createFunc)
+        public void RegisterFactory<TInterface>(Func<TInterface> createFunc) 
             where TInterface : class
         {
             if (createFunc == null)
@@ -70,98 +84,103 @@ namespace EasyIoc
             Type interfaceType = typeof(TInterface);
 
             if (!interfaceType.IsInterface)
-                throw new ArgumentException("Only an interface can be registered");
-
-            lock (_lockObject)
-                InternalRegister(interfaceType, NoImplementationType, () => createFunc);
-        }
-
-        public void Register<TInterface>(TInterface instance)
-            where TInterface : class
-        {
-            Type interfaceType = typeof(TInterface);
-
-            if (!interfaceType.IsInterface)
-                throw new ArgumentException("Only an interface can be registered");
+                throw new ArgumentException("Cannot RegisterFactory: Only an interface can be registered");
 
             lock (_lockObject)
             {
-                if (_instanceRegistry.ContainsKey(interfaceType))
+                if (_factories.ContainsKey(interfaceType))
                 {
-                    if (_instanceRegistry[interfaceType] != instance)
+                    if (_factories[interfaceType] != createFunc)
+                        throw new InvalidOperationException(String.Format("There is already a factory registered for interface {0}", interfaceType.FullName));
+                }
+                else
+                    _factories[interfaceType] = createFunc;
+            }
+        }
+
+        public void RegisterInstance<TInterface>(TInterface instance) 
+            where TInterface : class
+        {
+            if (instance == null)
+                throw new ArgumentNullException("instance");
+
+            Type interfaceType = typeof(TInterface);
+
+            if (!interfaceType.IsInterface)
+                throw new ArgumentException("Cannot RegisterInstance: Only an interface can be registered");
+
+            lock (_lockObject)
+            {
+                if (_instances.ContainsKey(interfaceType))
+                {
+                    if (_instances[interfaceType] != instance)
                         throw new InvalidOperationException(String.Format("There is already an instance registered for interface {0}", interfaceType.FullName));
                 }
                 else
-                    _instanceRegistry.Add(interfaceType, instance);
+                    _instances.Add(interfaceType, instance);
             }
         }
 
-        public void Unregister<TInterface>()
+        public void Unregister<TInterface>() 
             where TInterface : class
         {
             Type interfaceType = typeof(TInterface);
 
             lock (_lockObject)
             {
-                if (!_interfaceToImplementationMap.ContainsKey(interfaceType))
+                if (!_typeMaps.ContainsKey(interfaceType))
                     throw new ArgumentException("Cannot Unregister: No registration found for interface {0}", interfaceType.FullName);
 
-                _interfaceToImplementationMap.Remove(interfaceType);
-                _instanceRegistry.Remove(interfaceType);
-                _createInstanceFunc.Remove(interfaceType);
+                _typeMaps.Remove(interfaceType);
+                _factories.Remove(interfaceType);
+                _instances.Remove(interfaceType);
             }
         }
 
-        public TInterface Resolve<TInterface>(ResolveMethods method = ResolveMethods.Singleton)
+        public TInterface Resolve<TInterface>() 
             where TInterface : class
         {
-            Type interfaceType = typeof (TInterface);
+            Type interfaceType = typeof(TInterface);
 
             if (!interfaceType.IsInterface)
-                throw new ArgumentException("Only an interface can be resolved");
+                throw new ArgumentException("Cannot Resolve: Only an interface can be resolved");
 
             object resolved = null;
             lock (_lockObject)
             {
-                if (!_createInstanceFunc.ContainsKey(interfaceType))
-                    throw new ArgumentException(String.Format("Cannot Resolve: No registration found for interface {0}", interfaceType.FullName));
+                if (!_typeMaps.ContainsKey(interfaceType))
+                    throw new ArgumentException("Cannot Resolve: No registration found for interface {0}", interfaceType.FullName);
 
-                // Check if instance already created only if method is Singleton
-                if (method == ResolveMethods.Singleton && _instanceRegistry.ContainsKey(interfaceType))
-                    resolved = _instanceRegistry[interfaceType];
-
-                // If no instance found, create one
-                if (resolved == null)
-                {
-                    Func<object> creator = _createInstanceFunc[interfaceType];
-
-                    resolved = creator.DynamicInvoke(null);
-
-                    if (!_instanceRegistry.ContainsKey(interfaceType))
-                        _instanceRegistry.Add(interfaceType, resolved);
-                }
+                if (_instances.ContainsKey(interfaceType))
+                    resolved = _instances[interfaceType];
+                else if (_factories.ContainsKey(interfaceType))
+                    // TODO: to be continued
+                    ;
             }
-            return (TInterface) resolved;
+
+            return (TInterface)resolved;
         }
 
         public void Reset()
         {
             lock (_lockObject)
             {
-                _interfaceToImplementationMap.Clear();
-                _instanceRegistry.Clear();
-                _createInstanceFunc.Clear();
-            }
+                _typeMaps.Clear();
+                _factories.Clear();
+                _instances.Clear();
+            } 
         }
 
-        // Following methods are not responsible for sync-locking, this must be done by caller
-        private static Func<object> CreateObjectFunc(Type implementationType)
+        #endregion
+
+        // Following methods are responsible for locking collections, it's the caller responsability
+        private static Func<object> CreateFactory(Type implementationType)
         {
             ConstructorInfo[] constructorInfos = implementationType.GetConstructors();
 
             if (constructorInfos.Length == 0
                 || (constructorInfos.Length == 1 && !constructorInfos[0].IsPublic))
-                throw new Exception(String.Format("Cannot Resolve: No public constructor found in {0}.", implementationType.Name));
+                throw new Exception(String.Format("Cannot RegisterType: No public constructor found in {0}.", implementationType.Name));
 
             // TODO: get first parameterless ctor
             ConstructorInfo constructor = constructorInfos.First();
@@ -170,26 +189,9 @@ namespace EasyIoc
             // TODO: handle ctor with parameters
 
             if (parameterInfos.Length != 0)
-                throw new Exception(String.Format("Cannot Resolve: No parameterless constructor found"));
+                throw new Exception(String.Format("Cannot RegisterType: No parameterless constructor found"));
 
             return () => constructor.Invoke(null);
-        }
-
-        private void InternalRegister(Type interfaceType, Type implementationType, Func<Func<object>> createCreatorFunc)
-        {
-            if (_interfaceToImplementationMap.ContainsKey(interfaceType))
-            {
-                if (_interfaceToImplementationMap[interfaceType] != implementationType)
-                    throw new InvalidOperationException(String.Format("There is already a class/function registered for interface {0}", interfaceType.FullName));
-            }
-            else
-                _interfaceToImplementationMap.Add(interfaceType, implementationType);
-
-            if (!_createInstanceFunc.ContainsKey(interfaceType))
-            {
-                Func<object> creator = createCreatorFunc.Invoke();
-                _createInstanceFunc.Add(interfaceType, creator);
-            }
         }
     }
 }
