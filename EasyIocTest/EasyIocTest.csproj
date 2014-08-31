@@ -50,8 +50,9 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
-    <Compile Include="IocContainerFirstVersionTest.cs" />
+    <Compile Include="IocContainerTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Stubs.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\EasyIoc\EasyIoc.csproj">

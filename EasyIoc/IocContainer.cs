@@ -2,10 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 
-// TODO: continue Resolve + UnitTests
+// TODO: recursive CreateFactory, also called on each parameter
 
 namespace EasyIoc
 {
@@ -32,7 +30,7 @@ namespace EasyIoc
             where TInterface : class
         {
             Type interfaceType = typeof (TInterface);
-            bool found = false;
+            bool found;
             lock (_lockObject)
             {
                 found = _typeMaps.ContainsKey(interfaceType);
@@ -66,12 +64,6 @@ namespace EasyIoc
                 }
                 else
                     _typeMaps.Add(interfaceType, implementationType);
-
-                if (!_factories.ContainsKey(interfaceType))
-                {
-                    Func<object> creator = CreateFactory(implementationType);
-                    _factories.Add(interfaceType, creator);
-                }
             }
         }
 
@@ -129,7 +121,7 @@ namespace EasyIoc
             lock (_lockObject)
             {
                 if (!_typeMaps.ContainsKey(interfaceType))
-                    throw new ArgumentException("Cannot Unregister: No registration found for interface {0}", interfaceType.FullName);
+                    throw new ArgumentException(String.Format("Cannot Unregister: No registration found for interface {0}", interfaceType.FullName));
 
                 _typeMaps.Remove(interfaceType);
                 _factories.Remove(interfaceType);
@@ -145,17 +137,31 @@ namespace EasyIoc
             if (!interfaceType.IsInterface)
                 throw new ArgumentException("Cannot Resolve: Only an interface can be resolved");
 
-            object resolved = null;
+            object resolved;
             lock (_lockObject)
             {
                 if (!_typeMaps.ContainsKey(interfaceType))
-                    throw new ArgumentException("Cannot Resolve: No registration found for interface {0}", interfaceType.FullName);
+                    throw new ArgumentException(String.Format("Cannot Resolve: No registration found for interface {0}", interfaceType.FullName));
 
-                if (_instances.ContainsKey(interfaceType))
+                if (_instances.ContainsKey(interfaceType)) // Get instance if any registered
                     resolved = _instances[interfaceType];
-                else if (_factories.ContainsKey(interfaceType))
-                    // TODO: to be continued
-                    ;
+                else if (_factories.ContainsKey(interfaceType)) // Create new instance using exising factory if any registered or created on a previous Resolve
+                {
+                    Func<object> creator = _factories[interfaceType];
+
+                    resolved = creator.DynamicInvoke(null);
+                }
+                else // Create factory, register factory and create new instance
+                {
+                    if (!_typeMaps.ContainsKey(interfaceType))
+                        throw new ArgumentException(String.Format("Cannot Resolve: No registration found for interface {0}", interfaceType.FullName));
+                    Type implementationType = _typeMaps[interfaceType];
+                    
+                    Func<object> creator = CreateFactory(implementationType);
+                    _factories.Add(interfaceType, creator);
+
+                    resolved = creator.DynamicInvoke(null);
+                }
             }
 
             return (TInterface)resolved;
@@ -180,7 +186,7 @@ namespace EasyIoc
 
             if (constructorInfos.Length == 0
                 || (constructorInfos.Length == 1 && !constructorInfos[0].IsPublic))
-                throw new Exception(String.Format("Cannot RegisterType: No public constructor found in {0}.", implementationType.Name));
+                throw new ArgumentException(String.Format("Cannot Create Instance: No public constructor found in {0}.", implementationType.Name));
 
             // TODO: get first parameterless ctor
             ConstructorInfo constructor = constructorInfos.First();
@@ -189,9 +195,9 @@ namespace EasyIoc
             // TODO: handle ctor with parameters
 
             if (parameterInfos.Length != 0)
-                throw new Exception(String.Format("Cannot RegisterType: No parameterless constructor found"));
+                throw new ArgumentException(String.Format("Cannot Create Instance: No parameterless constructor found in {0}.", implementationType.Name));
 
-            return () => constructor.Invoke(null);
+            return (() => constructor.Invoke(null));
         }
     }
 }
