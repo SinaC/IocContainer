@@ -195,7 +195,7 @@ namespace EasyIocTest
         }
 
         [TestMethod]
-        public void TestResolveSingleInstance()
+        public void TestResolveSingleInstanceIfSingleton()
         {
             IocContainer.Default.Reset();
             IocContainer.Default.Register<ITestInterface1, TestClass1ImplementingInterface1>();
@@ -203,6 +203,33 @@ namespace EasyIocTest
             ITestInterface1 instance1 = IocContainer.Default.Resolve<ITestInterface1>();
             ITestInterface1 instance2 = IocContainer.Default.Resolve<ITestInterface1>();
 
+            Assert.AreEqual(instance1, instance2);
+        }
+
+        [TestMethod]
+        public void TestResolveMultipleInstanceIfNewInstance()
+        {
+            IocContainer.Default.Reset();
+            IocContainer.Default.Register<ITestInterface1, TestClass1ImplementingInterface1>();
+
+            ITestInterface1 instance1 = IocContainer.Default.Resolve<ITestInterface1>(ResolveMethods.NewInstance);
+            ITestInterface1 instance2 = IocContainer.Default.Resolve<ITestInterface1>(ResolveMethods.NewInstance);
+
+            Assert.AreNotEqual(instance1, instance2);
+        }
+
+        [TestMethod]
+        public void TestResolveReturnsRegisteredInstance()
+        {
+            IocContainer.Default.Reset();
+            IocContainer.Default.Register<ITestInterface1, TestClass1ImplementingInterface1>();
+            ITestInterface1 instance0 = new TestClass1ImplementingInterface1();
+            IocContainer.Default.Register(instance0);
+
+            ITestInterface1 instance1 = IocContainer.Default.Resolve<ITestInterface1>();
+            ITestInterface1 instance2 = IocContainer.Default.Resolve<ITestInterface1>();
+
+            Assert.AreEqual(instance0, instance1);
             Assert.AreEqual(instance1, instance2);
         }
 

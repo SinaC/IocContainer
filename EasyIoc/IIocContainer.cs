@@ -2,6 +2,12 @@
 
 namespace EasyIoc
 {
+    public enum ResolveMethods
+    {
+        NewInstance,
+        Singleton
+    }
+
     public interface IIocContainer
     {
         bool IsRegistered<TInterface>()
@@ -14,10 +20,13 @@ namespace EasyIoc
         void Register<TInterface>(Func<TInterface> createFunc)
             where TInterface : class;
 
+        void Register<TInterface>(TInterface instance)
+            where TInterface : class;
+
         void Unregister<TInterface>()
             where TInterface : class;
 
-        TInterface Resolve<TInterface>()
+        TInterface Resolve<TInterface>(ResolveMethods method = ResolveMethods.Singleton)
             where TInterface : class;
 
         void Reset();

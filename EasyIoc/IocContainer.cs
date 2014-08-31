@@ -5,6 +5,12 @@ using System.Reflection;
 
 namespace EasyIoc
 {
+    // TODO: major modifications, remove ResolveMethods
+    //  by default, Resolve returns a new instance
+    //  if an instance has been registered via Register, Resolve returns that instance
+    //  rename Register<,> to RegisterType
+    //  rename Register(instance) to RegisterInstance
+
     // TODO: recursive resolve on ctor parameters
     // questions: which ctor should be choosed if multiple ctor?
     public class IocContainer : IIocContainer
@@ -70,6 +76,26 @@ namespace EasyIoc
                 InternalRegister(interfaceType, NoImplementationType, () => createFunc);
         }
 
+        public void Register<TInterface>(TInterface instance)
+            where TInterface : class
+        {
+            Type interfaceType = typeof(TInterface);
+
+            if (!interfaceType.IsInterface)
+                throw new ArgumentException("Only an interface can be registered");
+
+            lock (_lockObject)
+            {
+                if (_instanceRegistry.ContainsKey(interfaceType))
+                {
+                    if (_instanceRegistry[interfaceType] != instance)
+                        throw new InvalidOperationException(String.Format("There is already an instance registered for interface {0}", interfaceType.FullName));
+                }
+                else
+                    _instanceRegistry.Add(interfaceType, instance);
+            }
+        }
+
         public void Unregister<TInterface>()
             where TInterface : class
         {
@@ -86,7 +112,7 @@ namespace EasyIoc
             }
         }
 
-        public TInterface Resolve<TInterface>()
+        public TInterface Resolve<TInterface>(ResolveMethods method = ResolveMethods.Singleton)
             where TInterface : class
         {
             Type interfaceType = typeof (TInterface);
@@ -100,8 +126,8 @@ namespace EasyIoc
                 if (!_createInstanceFunc.ContainsKey(interfaceType))
                     throw new ArgumentException(String.Format("Cannot Resolve: No registration found for interface {0}", interfaceType.FullName));
 
-                // Check if instance already created
-                if (_instanceRegistry.ContainsKey(interfaceType))
+                // Check if instance already created only if method is Singleton
+                if (method == ResolveMethods.Singleton && _instanceRegistry.ContainsKey(interfaceType))
                     resolved = _instanceRegistry[interfaceType];
 
                 // If no instance found, create one
