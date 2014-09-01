@@ -337,6 +337,41 @@ namespace EasyIocTest
         }
 
         [TestMethod]
+        public void TestResolveSimpleCyclicDependency()
+        {
+            IocContainer.Default.RegisterType<ITestInterface2, TestClass4ImplementingInterface2>();
+
+            try
+            {
+                ITestInterface2 instance = IocContainer.Default.Resolve<ITestInterface2>();
+
+                Assert.Fail("Exception not thrown");
+            }
+            catch (ArgumentException ex)
+            {
+                Assert.IsTrue(true);
+            }
+        }
+
+        [TestMethod]
+        public void TestResolveComplexCyclicDependency()
+        {
+            IocContainer.Default.RegisterType<ITestInterface1, TestClass6ImplementingInterface1>();
+            IocContainer.Default.RegisterType<ITestInterface2, TestClass3ImplementingInterface2>();
+
+            try
+            {
+                ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>();
+
+                Assert.Fail("Exception not thrown");
+            }
+            catch(ArgumentException ex)
+            {
+                Assert.IsTrue(true);
+            }
+        }
+
+        [TestMethod]
         public void TestUnregisterExceptionOnNonRegisteredInterface()
         {
             
