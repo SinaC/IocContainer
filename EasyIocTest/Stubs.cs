@@ -67,7 +67,33 @@
         }
     }
 
-    public class TestClassImplementatingNoInterface // Doesn't implement interface
+    public class TestClass5ImplementingInterface2 : ITestInterface2
     {
+        public TestClass5ImplementingInterface2(ITestInterface3 interface3)
+        {
+        }
+    }
+
+    public class TestClassImplementingNoInterface // Doesn't implement interface
+    {
+    }
+
+    public interface ITestInterface3
+    {
+    }
+
+    public class TestClass1ImplementingInterface3 : ITestInterface3
+    {
+        public TestClass1ImplementingInterface3(ITestInterface3 interface3)
+        {
+        }
+
+        public TestClass1ImplementingInterface3(ITestInterface2 interface2)
+        {
+        }
+
+        public TestClass1ImplementingInterface3(ITestInterface1 interface1)
+        {
+        }
     }
 }

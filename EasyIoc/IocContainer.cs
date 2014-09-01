@@ -65,7 +65,9 @@ namespace EasyIoc
                 else
                     _interfaceToImplementationMap.Add(interfaceType, implementationType);
 
-                // Resolvable is built on first Resolve
+                // Resolvable will be built on first Resolve
+                //  because BuildResolvableConstructor will check interfaceToImplementationMap to detect if a ctor is resolvable
+                //  and we cannot force the developer to use RegisterType in the right order
             }
         }
 
@@ -206,7 +208,10 @@ namespace EasyIoc
 
         private ResolvableConstructor BuildResolvableConstructor(Type interfaceType)
         {
-            List<Type> discoveredTypes = new List<Type>();
+            List<Type> discoveredTypes = new List<Type>
+                {
+                    interfaceType
+                };
             return InnerBuildResolvableConstructor(interfaceType, discoveredTypes);
         }
 
@@ -241,8 +246,6 @@ namespace EasyIoc
                         // No parameters
                     };
 
-            discoveredTypes.Add(interfaceType);
-
             // Check if a ctor has every parameters registered in container or resolvable, returns first resolvable
             foreach (var c in constructorAndParameters)
             {
@@ -252,9 +255,15 @@ namespace EasyIoc
                 foreach (ParameterInfo parameterInfo in c.Parameters)
                 {
                     if (discoveredTypes.Any(x => x == parameterInfo.ParameterType)) // check cyclic dependency
-                        return ResolvableConstructor.CyclicDependencyConstructor;
+                    {
+                        ok = false;
+                        break;
+                    }
 
+                    discoveredTypes.Add(parameterInfo.ParameterType);
                     ResolvableConstructor parameterResolvableConstructor = InnerBuildResolvableConstructor(parameterInfo.ParameterType, discoveredTypes);
+                    discoveredTypes.Remove(interfaceType);
+
                     if (!parameterResolvableConstructor.IsValid) // once an invalid ctor parameter has been found, try next ctor
                     {
                         ok = false;
