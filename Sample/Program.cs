@@ -1,5 +1,4 @@
-﻿using System.Reflection;
-using EasyIoc;
+﻿using EasyIoc;
 
 namespace Sample
 {
@@ -7,13 +6,14 @@ namespace Sample
     {
         static void Main(string[] args)
         {
-            IocContainer container = new IocContainer();
-            container.RegisterType<ITestInterface1, TestClass6ImplementatingInterface1>();
-            container.RegisterType<ITestInterface2, TestClass1ImplementingInterface2>();
-            container.RegisterType<ITestInterface3, TestClass1ImplementingInterface3>();
-            container.RegisterFactory<ITestInterface3>(() => new TestClass1ImplementingInterface3());
+            IocContainer.Default.RegisterType<ITestInterface1, TestClass6ImplementatingInterface1>();
+            IocContainer.Default.RegisterType<ITestInterface2, TestClass1ImplementingInterface2>();
+            IocContainer.Default.RegisterType<ITestInterface3, TestClass1ImplementingInterface3>();
+            IocContainer.Default.RegisterFactory<ITestInterface3>(() => new TestClass1ImplementingInterface3());
+            IocContainer.Default.RegisterInstance<ITestInterface3>(new TestClass1ImplementingInterface3());
+            //container.RegisterType<ITestInterface1, TestClass7ImplementatingInterface1>();
 
-            ITestInterface1 info = container.Test<ITestInterface1>();
+            ITestInterface1 info = IocContainer.Default.Resolve<ITestInterface1>();
         }
     }
 
@@ -25,9 +25,29 @@ namespace Sample
     {
         private static int _count = 0;
 
+        public ITestInterface2 TestInterface2 { get; set; }
+        public ITestInterface3 TestInterface3 { get; set; }
+
         public TestClass6ImplementatingInterface1(ITestInterface2 interface2, ITestInterface3 interface3)
         {
             _count++;
+
+            TestInterface2 = interface2;
+            TestInterface3 = interface3;
+        }
+    }
+
+    public class TestClass7ImplementatingInterface1 : ITestInterface1
+    {
+        private static int _count = 0;
+
+        public int X { get; set; }
+
+        public TestClass7ImplementatingInterface1(int x)
+        {
+            _count++;
+
+            X = x;
         }
     }
 
@@ -39,9 +59,13 @@ namespace Sample
     {
         private static int _count = 0;
 
+        public ITestInterface3 TestInterface3 { get; set; }
+
         public TestClass1ImplementingInterface2(ITestInterface3 interface3)
         {
             _count++;
+
+            TestInterface3 = interface3;
         }
     }
 
