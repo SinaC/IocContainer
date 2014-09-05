@@ -18,8 +18,11 @@
 
     public class TestClass3ImplementingInterface1 : ITestInterface1
     {
+        public int X { get; private set; }
+
         public TestClass3ImplementingInterface1(int x)
         {
+            X = x;
         }
     }
 

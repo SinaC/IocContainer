@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace EasyIoc
 {
@@ -21,6 +22,9 @@ namespace EasyIoc
             where TInterface : class;
 
         TInterface Resolve<TInterface>()
+            where TInterface : class;
+
+        TInterface Resolve<TInterface>(IEnumerable<ParameterValue> parameters)
             where TInterface : class;
 
         void Reset();

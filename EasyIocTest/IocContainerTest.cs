@@ -61,7 +61,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestSuccessfulRegistrationNoCreator()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
 
             ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>();
@@ -73,7 +72,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestSuccessfulRegistrationFactory()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
             IocContainer.Default.RegisterFactory<ITestInterface1>(() => new TestClass1ImplementingInterface1());
 
@@ -86,7 +84,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestRegisterFactoryWithoutRegisterType()
         {
-            
             IocContainer.Default.RegisterFactory<ITestInterface1>(() => new TestClass1ImplementingInterface1());
 
             try
@@ -104,8 +101,7 @@ namespace EasyIocTest
         [TestMethod]
         public void TestRegisterInstanceWithoutRegisterType()
         {
-            
-            IocContainer.Default.RegisterInstance<ITestInterface1>(new TestClass1ImplementingInterface1());
+           IocContainer.Default.RegisterInstance<ITestInterface1>(new TestClass1ImplementingInterface1());
 
             try
             {
@@ -122,8 +118,7 @@ namespace EasyIocTest
         [TestMethod]
         public void TestRegister2DifferentRegistrationsOnSameInterface()
         {
-            
-            IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
+           IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
 
             try
             {
@@ -140,7 +135,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestRegister2IdenticalRegistrationsOnSameInterface()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
             IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
 
@@ -152,8 +146,7 @@ namespace EasyIocTest
 
         [TestMethod]
         public void TestRegisterOnNonInterface()
-        {
-            
+        {   
             try
             {
                 IocContainer.Default.RegisterType<TestClass1ImplementingInterface1, TestClass1ImplementingInterface1>();
@@ -169,7 +162,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestRegisterOnAbstractClass()
         {
-            
             try
             {
                 IocContainer.Default.RegisterType<ITestInterface1, TestAbstractClassImplentatingInterface1>();
@@ -184,8 +176,7 @@ namespace EasyIocTest
 
         [TestMethod]
         public void TestRegisterInterfaceAsImplementation()
-        {
-            
+        { 
             try
             {
                 IocContainer.Default.RegisterType<ITestInterface1, ITestInterface1>();
@@ -201,7 +192,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestRegisterNotAssignableFrom()
         {
-            
             try
             {
                 IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface2>();
@@ -217,7 +207,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestIsRegisteredOnNonRegisteredInterface()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
 
             bool isRegistered = IocContainer.Default.IsRegistered<ITestInterface2>();
@@ -228,7 +217,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestIsRegisteredOnRegisteredInterface()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
 
             bool isRegistered = IocContainer.Default.IsRegistered<ITestInterface1>();
@@ -239,7 +227,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestResolveSingleInstanceOnRegisterInstance()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
             IocContainer.Default.RegisterInstance<ITestInterface1>(new TestClass1ImplementingInterface1());
 
@@ -252,7 +239,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestResolveMultipleInstanceOnRegisterType()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
 
             ITestInterface1 instance1 = IocContainer.Default.Resolve<ITestInterface1>();
@@ -264,7 +250,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestResolveReturnsRegisteredInstance()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
             ITestInterface1 instance0 = new TestClass1ImplementingInterface1();
             IocContainer.Default.RegisterInstance(instance0);
@@ -279,7 +264,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestResolveWithoutPublicConstructor()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass4ImplementingInterface1>();
 
             try
@@ -297,7 +281,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestResolveWithComplexConstructor()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass3ImplementingInterface1>();
 
             try
@@ -315,7 +298,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestResolveWithRegisterInstanceAndComplexConstructor()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass3ImplementingInterface1>();
             IocContainer.Default.RegisterInstance<ITestInterface1>(new TestClass3ImplementingInterface1(5));
 
@@ -327,7 +309,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestResolveWithRegisterInstanceAndNoPublicConstructor()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass4ImplementingInterface1>();
             IocContainer.Default.RegisterInstance<ITestInterface1>(new TestClass5ImplementingInterface1());
 
@@ -386,7 +367,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestUnregisterExceptionOnNonRegisteredInterface()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
 
             try
@@ -403,7 +383,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestUnregisterNoExceptionOnRegisteredInterface()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
 
             IocContainer.Default.Unregister<ITestInterface1>();
@@ -412,7 +391,6 @@ namespace EasyIocTest
         [TestMethod]
         public void TestIfUnregisterRemoveInterface()
         {
-            
             IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
 
             IocContainer.Default.Unregister<ITestInterface1>();
@@ -425,6 +403,39 @@ namespace EasyIocTest
             catch (ArgumentException)
             {
             }
+        }
+
+        [TestMethod]
+        public void TestResolveWithInvalidUserDefinedParameters()
+        {
+            IocContainer.Default.RegisterType<ITestInterface1, TestClass3ImplementingInterface1>();
+
+            try
+            {
+                ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>(new[]
+                    {
+                        new ParameterValue("y", 5)
+                    });
+                Assert.Fail("No exception thrown");
+            }
+            catch (ArgumentException)
+            {
+                Assert.IsTrue(true);
+            }
+        }
+
+        [TestMethod]
+        public void TestResolveWithUserDefinedParameters()
+        {
+            IocContainer.Default.RegisterType<ITestInterface1, TestClass3ImplementingInterface1>();
+
+            ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>(new[]
+                {
+                    new ParameterValue("x", 5),
+                });
+
+            Assert.IsInstanceOfType(instance, typeof(TestClass3ImplementingInterface1));
+            Assert.AreEqual((instance as TestClass3ImplementingInterface1).X, 5);
         }
     }
 }
