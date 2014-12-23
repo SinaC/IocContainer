@@ -266,7 +266,7 @@ namespace EasyIoc
             public static readonly ResolvableConstructor CyclicDependencyConstructor = new ResolvableConstructor();
 
             public Type InterfaceType { private get; set; }
-            public Type ImplementationType { private get; set; }
+            //public Type ImplementationType { private get; set; }
             public ConstructorInfo ConstructorInfo { private get; set; }
             public List<IResolvableParameter> Parameters { private get; set; }
 
@@ -283,6 +283,7 @@ namespace EasyIoc
                 // If parameterless, create instance
                 if (Parameters == null)
                 {
+                    // Search in registered instances
                     if (instances.ContainsKey(InterfaceType))
                         return instances[InterfaceType];
                     return ConstructorInfo.Invoke(null);
@@ -360,7 +361,7 @@ namespace EasyIoc
                 return new ResolvableConstructor
                     {
                         InterfaceType = interfaceType,
-                        ImplementationType = implementationType,
+                        //ImplementationType = implementationType, NOT USED
                         ConstructorInfo = parameterless.Constructor,
                         // No parameters
                     };
@@ -409,7 +410,7 @@ namespace EasyIoc
                     return new ResolvableConstructor
                         {
                             InterfaceType = interfaceType,
-                            ImplementationType = implementationType,
+                            //ImplementationType = implementationType, NOT USED
                             ConstructorInfo = c.Constructor,
                             Parameters = parametersResolvableConstructor
                         };

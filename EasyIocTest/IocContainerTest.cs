@@ -31,6 +31,16 @@ namespace EasyIocTest
         }
 
         [TestMethod]
+        public void TestDefaultDifferentThanResolved()
+        {
+            IocContainer.Default.RegisterType<IIocContainer, IocContainer>();
+
+            IIocContainer container = IocContainer.Default.Resolve<IIocContainer>();
+
+            Assert.AreNotSame(container, IocContainer.Default);
+        }
+
+        [TestMethod]
         public void TestReset()
         {
             IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
@@ -431,7 +441,7 @@ namespace EasyIocTest
 
             ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>(new[]
                 {
-                    new ParameterValue("x", 5),
+                    new ParameterValue("x", 5)
                 });
 
             Assert.IsInstanceOfType(instance, typeof(TestClass3ImplementingInterface1));
