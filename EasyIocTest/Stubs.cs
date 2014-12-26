@@ -39,8 +39,11 @@
 
     public class TestClass6ImplementingInterface1 : ITestInterface1
     {
+        public ITestInterface2 Interface2 { get; private set; }
+
         public TestClass6ImplementingInterface1(ITestInterface2 interface2)
         {
+            Interface2 = interface2;
         }
     }
 
@@ -58,22 +61,31 @@
 
     public class TestClass3ImplementingInterface2 : ITestInterface2
     {
+        public ITestInterface1 Interface1 { get; private set; }
+
         public TestClass3ImplementingInterface2(ITestInterface1 interface1)
         {
+            Interface1 = interface1;
         }
     }
 
     public class TestClass4ImplementingInterface2 : ITestInterface2
     {
+        public ITestInterface2 Interface2 { get; private set; }
+
         public TestClass4ImplementingInterface2(ITestInterface2 interface2)
         {
+            Interface2 = interface2;
         }
     }
 
     public class TestClass5ImplementingInterface2 : ITestInterface2
     {
+        public ITestInterface3 Interface3 { get; private set; }
+
         public TestClass5ImplementingInterface2(ITestInterface3 interface3)
         {
+            Interface3 = interface3;
         }
     }
 
@@ -87,16 +99,23 @@
 
     public class TestClass1ImplementingInterface3 : ITestInterface3
     {
+        public ITestInterface1 Interface1 { get; private set; }
+        public ITestInterface2 Interface2 { get; private set; }
+        public ITestInterface3 Interface3 { get; private set; }
+
         public TestClass1ImplementingInterface3(ITestInterface3 interface3)
         {
+            Interface3 = interface3;
         }
 
         public TestClass1ImplementingInterface3(ITestInterface2 interface2)
         {
+            Interface2 = interface2;
         }
 
         public TestClass1ImplementingInterface3(ITestInterface1 interface1)
         {
+            Interface1 = interface1;
         }
     }
 }

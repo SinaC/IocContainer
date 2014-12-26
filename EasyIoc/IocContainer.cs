@@ -4,16 +4,15 @@ using System.Linq;
 using System.Reflection;
 
 // Unless a specific instance has been registered via RegisterInstance, every Resolve will create a new instance
-// Resolve with parameters doesn't use resolvable constructor cache
 
 namespace EasyIoc
 {
-    public class IocContainer : IIocContainer
+    public sealed class IocContainer : IIocContainer
     {
-        private readonly Dictionary<Type, Type> _interfaceToImplementationMap = new Dictionary<Type, Type>();
-        private readonly Dictionary<Type, Func<object>> _factories = new Dictionary<Type, Func<object>>();
-        private readonly Dictionary<Type, object> _instances = new Dictionary<Type, object>();
-        private readonly Dictionary<Type, ResolvableConstructor> _resolvableConstructors = new Dictionary<Type, ResolvableConstructor>();
+        private readonly Dictionary<Type, Type> _implementations = new Dictionary<Type, Type>(); // registrered with RegisterType
+        private readonly Dictionary<Type, Func<object>> _factories = new Dictionary<Type, Func<object>>(); // registered with RegisterFactory
+        private readonly Dictionary<Type, object> _instances = new Dictionary<Type, object>(); // registered with RegisterInstance
+        private readonly Dictionary<Type, ResolveNodeBase> _resolveTrees = new Dictionary<Type, ResolveNodeBase>();
 
         private readonly object _lockObject = new object();
 
@@ -32,14 +31,14 @@ namespace EasyIoc
             bool found;
             lock (_lockObject)
             {
-                found = _interfaceToImplementationMap.ContainsKey(interfaceType);
+                found = _implementations.ContainsKey(interfaceType) || _factories.ContainsKey(interfaceType) || _instances.ContainsKey(interfaceType);
             }
             return found;
         }
 
         public void RegisterType<TInterface, TImplementation>()
             where TInterface : class
-            where TImplementation : class
+            where TImplementation : class, TInterface
         {
             Type interfaceType = typeof (TInterface);
 
@@ -49,24 +48,27 @@ namespace EasyIoc
             Type implementationType = typeof (TImplementation);
 
             if (implementationType.IsInterface || implementationType.IsAbstract)
-                throw new ArgumentException("Cannot Register: No interface or abstract class is  valid as implementation");
+                throw new ArgumentException("Cannot Register: No interface or abstract class is valid as implementation");
 
             if (!interfaceType.IsAssignableFrom(implementationType))
                 throw new ArgumentException(String.Format("{0} is not assignable from {1}", interfaceType.FullName, implementationType.FullName));
 
             lock (_lockObject)
             {
-                if (_interfaceToImplementationMap.ContainsKey(interfaceType))
+                if (_factories.ContainsKey(interfaceType))
+                    throw new ArgumentException("Cannot Register: A factory has already been registered");
+
+                if (_instances.ContainsKey(interfaceType))
+                    throw new ArgumentException("Cannot Register: An instance has already been registered");
+
+                if (_implementations.ContainsKey(interfaceType))
                 {
-                    if (_interfaceToImplementationMap[interfaceType] != implementationType)
-                        throw new InvalidOperationException(String.Format("There is already an implementation registered for interface {0}", interfaceType.FullName));
+                    if (_implementations[interfaceType] != implementationType)
+                        throw new ArgumentException(String.Format("Cannot Register: An implementation has already been registered for interface {0}", interfaceType.FullName));
                 }
                 else
-                    _interfaceToImplementationMap.Add(interfaceType, implementationType);
-
-                // Resolvable will be built on first Resolve
-                //  because BuildResolvableConstructor will check interfaceToImplementationMap to detect if a ctor is resolvable
-                //  and we cannot force the developer to use RegisterType in the right order
+                    _implementations.Add(interfaceType, implementationType);
+                // ResolveTree will be built on first call to Resolve
             }
         }
 
@@ -83,10 +85,16 @@ namespace EasyIoc
 
             lock (_lockObject)
             {
+                if (_implementations.ContainsKey(interfaceType))
+                    throw new ArgumentException("Cannot RegisterFactory: An implementation has already been registered");
+
+                if (_instances.ContainsKey(interfaceType))
+                    throw new ArgumentException("Cannot RegisterFactory: An instance has already been registered");
+
                 if (_factories.ContainsKey(interfaceType))
                 {
                     if (_factories[interfaceType] != createFunc)
-                        throw new InvalidOperationException(String.Format("There is already a factory registered for interface {0}", interfaceType.FullName));
+                        throw new ArgumentException(String.Format("Cannot RegisterFactory: A factory has already been registered for interface {0}", interfaceType.FullName));
                 }
                 else
                     _factories[interfaceType] = createFunc;
@@ -106,10 +114,16 @@ namespace EasyIoc
 
             lock (_lockObject)
             {
+                if (_implementations.ContainsKey(interfaceType))
+                    throw new ArgumentException("Cannot RegisterFactory: An implementation has already been registered");
+
+                if (_factories.ContainsKey(interfaceType))
+                    throw new ArgumentException("Cannot RegisterInstance: A factory has already been registered");
+
                 if (_instances.ContainsKey(interfaceType))
                 {
                     if (_instances[interfaceType] != instance)
-                        throw new InvalidOperationException(String.Format("There is already an instance registered for interface {0}", interfaceType.FullName));
+                        throw new ArgumentException(String.Format("Cannot RegisterInstance: An instance has already been registered for interface {0}", interfaceType.FullName));
                 }
                 else
                     _instances.Add(interfaceType, instance);
@@ -123,20 +137,49 @@ namespace EasyIoc
 
             lock (_lockObject)
             {
-                if (!_interfaceToImplementationMap.ContainsKey(interfaceType))
-                    throw new ArgumentException(String.Format("Cannot Unregister: No registration found for interface {0}", interfaceType.FullName));
-
-                _interfaceToImplementationMap.Remove(interfaceType);
+                _implementations.Remove(interfaceType);
                 _factories.Remove(interfaceType);
                 _instances.Remove(interfaceType);
-                _resolvableConstructors.Remove(interfaceType);
+                _resolveTrees.Remove(interfaceType);
             }
         }
 
-        public TInterface Resolve<TInterface>()
+        public void UnregisterType<TInterface>()
             where TInterface : class
         {
-            Type interfaceType = typeof (TInterface);
+            Type interfaceType = typeof(TInterface);
+            lock (_lockObject)
+            {
+                _implementations.Remove(interfaceType);
+                _resolveTrees.Remove(interfaceType); // Force ResolveTree rebuild
+            }
+        }
+
+        public void UnregisterFactory<TInterface>()
+            where TInterface : class
+        {
+            Type interfaceType = typeof(TInterface);
+            lock (_lockObject)
+            {
+                _factories.Remove(interfaceType);
+                _resolveTrees.Remove(interfaceType); // Force ResolveTree rebuild
+            }
+        }
+
+        public void UnregisterInstance<TInterface>()
+            where TInterface : class
+        {
+            Type interfaceType = typeof(TInterface);
+            lock (_lockObject)
+            {
+                _instances.Remove(interfaceType);
+                _resolveTrees.Remove(interfaceType); // Force ResolveTree rebuild
+            }
+        }
+
+        public TInterface Resolve<TInterface>() where TInterface : class
+        {
+            Type interfaceType = typeof(TInterface);
 
             if (!interfaceType.IsInterface)
                 throw new ArgumentException("Cannot Resolve: Only an interface can be resolved");
@@ -144,49 +187,43 @@ namespace EasyIoc
             object resolved;
             lock (_lockObject)
             {
-                if (!_interfaceToImplementationMap.ContainsKey(interfaceType))
-                    throw new ArgumentException(String.Format("Cannot Resolve: No registration found for interface {0}", interfaceType.FullName));
-
-                // Search in registered instances
-                if (_instances.ContainsKey(interfaceType))
-                    resolved = _instances[interfaceType];
+                // Search in resolve tree cache
+                ResolveNodeBase resolveTree;
+                if (_resolveTrees.ContainsKey(interfaceType))
+                    resolveTree = _resolveTrees[interfaceType];
                 else
                 {
-                    // Search in resolvable constructor cache
-                    ResolvableConstructor resolvableConstructor;
-                    if (_resolvableConstructors.ContainsKey(interfaceType))
-                        resolvableConstructor = _resolvableConstructors[interfaceType];
-                    else
-                    {
-                        // Create resolvable constructor
-                        resolvableConstructor = BuildResolvableConstructor(interfaceType);
-                        _resolvableConstructors.Add(interfaceType, resolvableConstructor);
-                    }
-                    // Check errors
-                    if (resolvableConstructor == ResolvableConstructor.TypeNotRegistered)
+                    // Create resolve tree
+                    resolveTree = BuildResolveTree(interfaceType);
+                    if (!(resolveTree is ErrorNode))
+                        _resolveTrees.Add(interfaceType, resolveTree); // save resolve tree only if not in error
+                }
+                // Check errors
+                if (resolveTree is ErrorNode)
+                {
+                    if (resolveTree == ErrorNode.TypeNotRegistered)
                         throw new ArgumentException(String.Format("Cannot Resolve: No registration found for type {0}", interfaceType.FullName));
-                    if (resolvableConstructor == ResolvableConstructor.NoPublicConstructorOrNoConstructor)
+                    if (resolveTree == ErrorNode.NoPublicConstructorOrNoConstructor)
                         throw new ArgumentException(String.Format("Cannot Resolve: No constructor or not public constructor for type {0}", interfaceType.FullName));
-                    if (resolvableConstructor == ResolvableConstructor.NoResolvableConstructor)
+                    if (resolveTree == ErrorNode.NoResolvableConstructor)
                         throw new ArgumentException(String.Format("Cannot Resolve: No resolvable constructor for type {0}", interfaceType.FullName));
-                    if (resolvableConstructor == ResolvableConstructor.CyclicDependencyConstructor)
+                    if (resolveTree == ErrorNode.CyclicDependencyConstructor)
                         throw new ArgumentException(String.Format("Cannot Resolve: Cyclic dependency detected for type {0}", interfaceType.FullName));
-                    // Create instance
-                    try
-                    {
-                        resolved = resolvableConstructor.Resolve(_instances, _factories);
-                    }
-                    catch (InvalidOperationException ex)
-                    {
-                        throw new InvalidOperationException("Cannot Resolve: See innerException", ex);
-                    }
+                }
+                // Create instance
+                try
+                {
+                    resolved = resolveTree.Resolve();
+                }
+                catch (InvalidOperationException ex)
+                {
+                    throw new InvalidOperationException("Cannot Resolve: See innerException", ex);
                 }
             }
-            return (TInterface) resolved;
+            return (TInterface)resolved;
         }
 
-        public TInterface Resolve<TInterface>(IEnumerable<ParameterValue> parameters)
-            where TInterface : class
+        public TInterface Resolve<TInterface>(IEnumerable<ParameterValue> parameters) where TInterface : class
         {
             Type interfaceType = typeof (TInterface);
 
@@ -196,34 +233,30 @@ namespace EasyIoc
             object resolved;
             lock (_lockObject)
             {
-                if (!_interfaceToImplementationMap.ContainsKey(interfaceType))
-                    throw new ArgumentException(String.Format("Cannot Resolve: No registration found for interface {0}", interfaceType.FullName));
-
-                // Search in registered instances
-                if (_instances.ContainsKey(interfaceType))
-                    resolved = _instances[interfaceType];
-                else
+                // Don't search in resolvable constructor cache: ResolveTree may be different with or without parameters
+                // Create resolve tree
+                List<ParameterValue> parametersList = parameters == null ? null : parameters.ToList();
+                ResolveNodeBase resolveTree = BuildResolveTree(interfaceType, parametersList);
+                // Check errors
+                if (resolveTree is ErrorNode)
                 {
-                    // Create resolvable constructor
-                    List<ParameterValue> userDefinedParameters = parameters.ToList();
-                    ResolvableConstructor resolvableConstructor = BuildResolvableConstructor(interfaceType, userDefinedParameters);
-                    if (resolvableConstructor == ResolvableConstructor.TypeNotRegistered)
+                    if (resolveTree == ErrorNode.TypeNotRegistered)
                         throw new ArgumentException(String.Format("Cannot Resolve: No registration found for type {0}", interfaceType.FullName));
-                    if (resolvableConstructor == ResolvableConstructor.NoPublicConstructorOrNoConstructor)
+                    if (resolveTree == ErrorNode.NoPublicConstructorOrNoConstructor)
                         throw new ArgumentException(String.Format("Cannot Resolve: No constructor or not public constructor for type {0}", interfaceType.FullName));
-                    if (resolvableConstructor == ResolvableConstructor.NoResolvableConstructor)
+                    if (resolveTree == ErrorNode.NoResolvableConstructor)
                         throw new ArgumentException(String.Format("Cannot Resolve: No resolvable constructor for type {0}", interfaceType.FullName));
-                    if (resolvableConstructor == ResolvableConstructor.CyclicDependencyConstructor)
+                    if (resolveTree == ErrorNode.CyclicDependencyConstructor)
                         throw new ArgumentException(String.Format("Cannot Resolve: Cyclic dependency detected for type {0}", interfaceType.FullName));
-                    // Create instance
-                    try
-                    {
-                        resolved = resolvableConstructor.Resolve(_instances, _factories);
-                    }
-                    catch (InvalidOperationException ex)
-                    {
-                        throw new InvalidOperationException("Cannot Resolve: See innerException", ex);
-                    }
+                }
+                // Create instance
+                try
+                {
+                    resolved = resolveTree.Resolve();
+                }
+                catch (InvalidOperationException ex)
+                {
+                    throw new InvalidOperationException("Cannot Resolve: See innerException", ex);
                 }
             }
             return (TInterface) resolved;
@@ -233,120 +266,142 @@ namespace EasyIoc
         {
             lock (_lockObject)
             {
-                _interfaceToImplementationMap.Clear();
+                _implementations.Clear();
                 _factories.Clear();
                 _instances.Clear();
-                _resolvableConstructors.Clear();
+                _resolveTrees.Clear();
             }
         }
 
         #endregion
 
-        // Following methods are NOT responsible for locking collections
-        private interface IResolvableParameter
+        // Following code is NOT responsible for locking collections
+
+        #region Resolve Tree
+
+        private abstract class ResolveNodeBase
         {
-            object Resolve(IDictionary<Type, object> instances, IDictionary<Type, Func<object>> factories);
+            public Type InterfaceType { protected get; set; }
+
+            public abstract object Resolve();
         }
 
-        private class UserDefinedParameter : IResolvableParameter
+        private sealed class ErrorNode : ResolveNodeBase
         {
-            public ParameterValue ParameterValue { get; set; }
+            public static readonly ResolveNodeBase TypeNotRegistered = new ErrorNode();
+            public static readonly ResolveNodeBase NoPublicConstructorOrNoConstructor = new ErrorNode();
+            public static readonly ResolveNodeBase NoResolvableConstructor = new ErrorNode();
+            public static readonly ResolveNodeBase CyclicDependencyConstructor = new ErrorNode();
 
-            public object Resolve(IDictionary<Type, object> instances, IDictionary<Type, Func<object>> factories)
+            public override object Resolve()
             {
+                throw new InvalidOperationException("Cannot resolve an ErrorNode");
+            }
+        }
+
+        private sealed class ValueNode : ResolveNodeBase
+        {
+            public IParameterValue ParameterValue { private get; set; }
+
+            public override object Resolve()
+            {
+                if (ParameterValue == null)
+                    throw new InvalidOperationException("No parameter value");
                 return ParameterValue.Value;
             }
         }
 
-        private class ResolvableConstructor : IResolvableParameter
+        private sealed class FactoryNode : ResolveNodeBase
         {
-            public static readonly ResolvableConstructor TypeNotRegistered = new ResolvableConstructor();
-            public static readonly ResolvableConstructor NoPublicConstructorOrNoConstructor = new ResolvableConstructor();
-            public static readonly ResolvableConstructor NoResolvableConstructor = new ResolvableConstructor();
-            public static readonly ResolvableConstructor CyclicDependencyConstructor = new ResolvableConstructor();
+            public Func<object> Factory { private get; set; }
 
-            public Type InterfaceType { private get; set; }
-            //public Type ImplementationType { private get; set; }
-            public ConstructorInfo ConstructorInfo { private get; set; }
-            public List<IResolvableParameter> Parameters { private get; set; }
-
-            public bool IsValid
+            public override object Resolve()
             {
-                get { return this != TypeNotRegistered && this != NoPublicConstructorOrNoConstructor && this != NoResolvableConstructor && this != CyclicDependencyConstructor; }
-            }
+                if (Factory == null)
+                    throw new InvalidOperationException(String.Format("No factory for type {0}", InterfaceType.FullName));
 
-            public object Resolve(IDictionary<Type, object> instances, IDictionary<Type, Func<object>> factories)
+                object instance = Factory.DynamicInvoke(null);
+                return instance;
+            }
+        }
+
+        private sealed class InstanceNode : ResolveNodeBase
+        {
+            public object Instance { private get; set; }
+
+            public override object Resolve()
+            {
+                return Instance;
+            }
+        }
+
+        private sealed class BuildableNode : ResolveNodeBase
+        {
+            public ConstructorInfo ConstructorInfo { get; set; }
+            public List<ResolveNodeBase> Parameters { get; set; }
+
+            public override object Resolve()
             {
                 if (ConstructorInfo == null)
-                    throw new InvalidOperationException("No constructor info found");
+                    throw new InvalidOperationException(String.Format("No constructor info for type {0}", InterfaceType.FullName));
 
                 // If parameterless, create instance
                 if (Parameters == null)
-                {
-                    // Search in registered instances
-                    if (instances.ContainsKey(InterfaceType))
-                        return instances[InterfaceType];
                     return ConstructorInfo.Invoke(null);
-                }
 
                 // If parameters, recursively create parameters instance
                 object[] parameters = new object[Parameters.Count];
                 for (int i = 0; i < Parameters.Count; i++)
                 {
-                    IResolvableParameter unspecializedParameter = Parameters[i];
+                    ResolveNodeBase unspecializedParameter = Parameters[i];
 
-                    if (unspecializedParameter is UserDefinedParameter)
-                        parameters[i] = (unspecializedParameter as UserDefinedParameter).ParameterValue.Value;
-                    else if (unspecializedParameter is ResolvableConstructor)
-                    {
-                        ResolvableConstructor parameter = unspecializedParameter as ResolvableConstructor;
-
-                        // Search in registered instances
-                        if (instances.ContainsKey(parameter.InterfaceType))
-                            parameters[i] = instances[parameter.InterfaceType];
-                        else
-                        {
-                            object parameterInstance;
-                            // Use factory is any registered for parameter type
-                            if (factories.ContainsKey(parameter.InterfaceType))
-                            {
-                                Func<object> factory = factories[parameter.InterfaceType];
-                                parameterInstance = factory.DynamicInvoke(null);
-                            }
-                            else
-                                // Recursively resolve parameter
-                                parameterInstance = unspecializedParameter.Resolve(instances, factories);
-                            parameters[i] = parameterInstance;
-                        }
-                    }
-
+                    object parameterValue = unspecializedParameter.Resolve();
+                    parameters[i] = parameterValue;
                 }
                 // and create instance using parameters
                 return ConstructorInfo.Invoke(parameters);
             }
         }
 
-        private ResolvableConstructor BuildResolvableConstructor(Type interfaceType, List<ParameterValue> userDefinedParameters = null)
+        private ResolveNodeBase BuildResolveTree(Type interfaceType, List<ParameterValue> userDefinedParameters = null)
         {
             List<Type> discoveredTypes = new List<Type>
                 {
                     interfaceType
                 };
-            return InnerBuildResolvableConstructor(interfaceType, discoveredTypes, userDefinedParameters);
+            return InnerBuildResolveTree(interfaceType, discoveredTypes, userDefinedParameters);
         }
 
-        private ResolvableConstructor InnerBuildResolvableConstructor(Type interfaceType, ICollection<Type> discoveredTypes, List<ParameterValue> userDefinedParameters = null)
+        private ResolveNodeBase InnerBuildResolveTree(Type interfaceType, ICollection<Type> discoveredTypes, List<ParameterValue> userDefinedParameters = null)
         {
-            if (!_interfaceToImplementationMap.ContainsKey(interfaceType))
-                return ResolvableConstructor.TypeNotRegistered;
+            // Factory ?
+            Func<object> factory;
+            if (_factories.TryGetValue(interfaceType, out factory))
+                return new FactoryNode
+                    {
+                        InterfaceType = interfaceType,
+                        Factory = factory
+                    };
+            // Instance ?
+            object instance;
+            if (_instances.TryGetValue(interfaceType, out instance))
+                return new InstanceNode
+                    {
+                        InterfaceType = interfaceType,
+                        Instance = instance
+                    };
 
-            Type implementationType = _interfaceToImplementationMap[interfaceType];
+            // Implementation ?
+            Type implementationType;
+            if (!_implementations.TryGetValue(interfaceType, out implementationType))
+                return ErrorNode.TypeNotRegistered;
 
             ConstructorInfo[] constructorInfos = implementationType.GetConstructors();
 
+            // Valid constructor ?
             if (constructorInfos.Length == 0
                 || (constructorInfos.Length == 1 && !constructorInfos[0].IsPublic))
-                return ResolvableConstructor.NoPublicConstructorOrNoConstructor;
+                return ErrorNode.NoPublicConstructorOrNoConstructor;
 
             // Get parameters for each ctor
             var constructorAndParameters = constructorInfos.Select(x => new
@@ -358,31 +413,30 @@ namespace EasyIoc
             // Get first parameterless if any
             var parameterless = constructorAndParameters.FirstOrDefault(x => x.Parameters.Length == 0);
             if (parameterless != null)
-                return new ResolvableConstructor
+                return new BuildableNode
                     {
                         InterfaceType = interfaceType,
-                        //ImplementationType = implementationType, NOT USED
-                        ConstructorInfo = parameterless.Constructor,
-                        // No parameters
+                        ConstructorInfo = parameterless.Constructor
                     };
 
             // Check if every ctor's parameter is registered in container or resolvable, returns first resolvable
             foreach (var c in constructorAndParameters)
             {
-                List<IResolvableParameter> parametersResolvableConstructor = new List<IResolvableParameter>(c.Parameters.Length);
+                List<ResolveNodeBase> parametersResolvable = new List<ResolveNodeBase>(c.Parameters.Length);
 
+                // Try to resolved every parameters
                 bool ok = true;
                 foreach (ParameterInfo parameterInfo in c.Parameters)
                 {
-                    if (userDefinedParameters != null && userDefinedParameters.Any(x => x.Name == parameterInfo.Name))
+                    ParameterValue parameterValue = userDefinedParameters != null ? userDefinedParameters.FirstOrDefault(x => x.Name == parameterInfo.Name) : null;
+                    if (parameterValue != null)
                     {
-                        ParameterValue parameterValue = userDefinedParameters.First(x => x.Name == parameterInfo.Name);
-
-                        IResolvableParameter parameter = new UserDefinedParameter
+                        ValueNode parameter = new ValueNode
                             {
+                                InterfaceType = null,
                                 ParameterValue = parameterValue
                             };
-                        parametersResolvableConstructor.Add(parameter);
+                        parametersResolvable.Add(parameter);
                     }
                     else
                     {
@@ -392,33 +446,445 @@ namespace EasyIoc
                             break;
                         }
 
-                        discoveredTypes.Add(parameterInfo.ParameterType);
-                        ResolvableConstructor parameterResolvableConstructor = InnerBuildResolvableConstructor(parameterInfo.ParameterType, discoveredTypes);
-                        discoveredTypes.Remove(interfaceType);
+                        discoveredTypes.Add(parameterInfo.ParameterType); // add parameter type to discovered type
+                        ResolveNodeBase parameter = InnerBuildResolveTree(parameterInfo.ParameterType, discoveredTypes, userDefinedParameters);
+                        discoveredTypes.Remove(interfaceType); // remove parameter type from discovered type
 
-                        if (!parameterResolvableConstructor.IsValid) // once an invalid ctor parameter has been found, try next ctor
+                        if (parameter is ErrorNode) // once an invalid ctor parameter has been found, try next ctor
                         {
                             ok = false;
                             break;
                         }
-                        parametersResolvableConstructor.Add(parameterResolvableConstructor);
+                        parametersResolvable.Add(parameter);
                     }
 
                 }
 
                 if (ok)
-                    return new ResolvableConstructor
+                    return new BuildableNode
                         {
                             InterfaceType = interfaceType,
-                            //ImplementationType = implementationType, NOT USED
                             ConstructorInfo = c.Constructor,
-                            Parameters = parametersResolvableConstructor
+                            Parameters = parametersResolvable
                         };
             }
-
-            //
-            return ResolvableConstructor.NoResolvableConstructor;
+            return ErrorNode.NoResolvableConstructor;
         }
 
+        #endregion
     }
+
+    // Old implementation, RegisterType was mandatory even when using RegisterFactory or RegisterInstance
+    //public class IocContainer2 : IIocContainer
+    //{
+    //    private readonly Dictionary<Type, Type> _interfaceToImplementationMap = new Dictionary<Type, Type>();
+    //    private readonly Dictionary<Type, Func<object>> _factories = new Dictionary<Type, Func<object>>();
+    //    private readonly Dictionary<Type, object> _instances = new Dictionary<Type, object>();
+    //    private readonly Dictionary<Type, ResolvableConstructor> _resolvableConstructors = new Dictionary<Type, ResolvableConstructor>();
+
+    //    private readonly object _lockObject = new object();
+
+    //    private static readonly Lazy<IocContainer> LazyDefault = new Lazy<IocContainer>(() => new IocContainer());
+    //    public static IIocContainer Default
+    //    {
+    //        get { return LazyDefault.Value; }
+    //    }
+
+    //    #region IIocContainer
+
+    //    public bool IsRegistered<TInterface>()
+    //        where TInterface : class
+    //    {
+    //        Type interfaceType = typeof(TInterface);
+    //        bool found;
+    //        lock (_lockObject)
+    //        {
+    //            found = _interfaceToImplementationMap.ContainsKey(interfaceType);
+    //        }
+    //        return found;
+    //    }
+
+    //    public void RegisterType<TInterface, TImplementation>()
+    //        where TInterface : class
+    //        where TImplementation : class, TInterface
+    //    {
+    //        Type interfaceType = typeof(TInterface);
+
+    //        if (!interfaceType.IsInterface)
+    //            throw new ArgumentException("Cannot Register: Only an interface can be registered");
+
+    //        Type implementationType = typeof(TImplementation);
+
+    //        if (implementationType.IsInterface || implementationType.IsAbstract)
+    //            throw new ArgumentException("Cannot Register: No interface or abstract class is  valid as implementation");
+
+    //        if (!interfaceType.IsAssignableFrom(implementationType))
+    //            throw new ArgumentException(String.Format("{0} is not assignable from {1}", interfaceType.FullName, implementationType.FullName));
+
+    //        lock (_lockObject)
+    //        {
+    //            if (_interfaceToImplementationMap.ContainsKey(interfaceType))
+    //            {
+    //                if (_interfaceToImplementationMap[interfaceType] != implementationType)
+    //                    throw new InvalidOperationException(String.Format("There is already an implementation registered for interface {0}", interfaceType.FullName));
+    //            }
+    //            else
+    //                _interfaceToImplementationMap.Add(interfaceType, implementationType);
+
+    //            // Resolvable will be built on first Resolve
+    //            //  because BuildResolvableConstructor will check interfaceToImplementationMap to detect if a ctor is resolvable
+    //            //  and we cannot force the developer to use RegisterType in the right order
+    //        }
+    //    }
+
+    //    public void RegisterFactory<TInterface>(Func<TInterface> createFunc)
+    //        where TInterface : class
+    //    {
+    //        if (createFunc == null)
+    //            throw new ArgumentNullException("createFunc");
+
+    //        Type interfaceType = typeof(TInterface);
+
+    //        if (!interfaceType.IsInterface)
+    //            throw new ArgumentException("Cannot RegisterFactory: Only an interface can be registered");
+
+    //        lock (_lockObject)
+    //        {
+    //            if (_factories.ContainsKey(interfaceType))
+    //            {
+    //                if (_factories[interfaceType] != createFunc)
+    //                    throw new InvalidOperationException(String.Format("There is already a factory registered for interface {0}", interfaceType.FullName));
+    //            }
+    //            else
+    //                _factories[interfaceType] = createFunc;
+    //        }
+    //    }
+
+    //    public void RegisterInstance<TInterface>(TInterface instance)
+    //        where TInterface : class
+    //    {
+    //        if (instance == null)
+    //            throw new ArgumentNullException("instance");
+
+    //        Type interfaceType = typeof(TInterface);
+
+    //        if (!interfaceType.IsInterface)
+    //            throw new ArgumentException("Cannot RegisterInstance: Only an interface can be registered");
+
+    //        lock (_lockObject)
+    //        {
+    //            if (_instances.ContainsKey(interfaceType))
+    //            {
+    //                if (_instances[interfaceType] != instance)
+    //                    throw new InvalidOperationException(String.Format("There is already an instance registered for interface {0}", interfaceType.FullName));
+    //            }
+    //            else
+    //                _instances.Add(interfaceType, instance);
+    //        }
+    //    }
+
+    //    public void Unregister<TInterface>()
+    //        where TInterface : class
+    //    {
+    //        Type interfaceType = typeof(TInterface);
+
+    //        lock (_lockObject)
+    //        {
+    //            if (!_interfaceToImplementationMap.ContainsKey(interfaceType))
+    //                throw new ArgumentException(String.Format("Cannot Unregister: No registration found for interface {0}", interfaceType.FullName));
+
+    //            _interfaceToImplementationMap.Remove(interfaceType);
+    //            _factories.Remove(interfaceType);
+    //            _instances.Remove(interfaceType);
+    //            _resolvableConstructors.Remove(interfaceType);
+    //        }
+    //    }
+
+    //    public TInterface Resolve<TInterface>()
+    //        where TInterface : class
+    //    {
+    //        Type interfaceType = typeof(TInterface);
+
+    //        if (!interfaceType.IsInterface)
+    //            throw new ArgumentException("Cannot Resolve: Only an interface can be resolved");
+
+    //        object resolved;
+    //        lock (_lockObject)
+    //        {
+    //            if (!_interfaceToImplementationMap.ContainsKey(interfaceType))
+    //                throw new ArgumentException(String.Format("Cannot Resolve: No registration found for interface {0}", interfaceType.FullName));
+
+    //            // Search in registered instances
+    //            if (_instances.ContainsKey(interfaceType))
+    //                resolved = _instances[interfaceType];
+    //            else
+    //            {
+    //                // Search in resolvable constructor cache
+    //                ResolvableConstructor resolvableConstructor;
+    //                if (_resolvableConstructors.ContainsKey(interfaceType))
+    //                    resolvableConstructor = _resolvableConstructors[interfaceType];
+    //                else
+    //                {
+    //                    // Create resolvable constructor
+    //                    resolvableConstructor = BuildResolvableConstructor(interfaceType);
+    //                    _resolvableConstructors.Add(interfaceType, resolvableConstructor);
+    //                }
+    //                // Check errors
+    //                if (resolvableConstructor == ResolvableConstructor.TypeNotRegistered)
+    //                    throw new ArgumentException(String.Format("Cannot Resolve: No registration found for type {0}", interfaceType.FullName));
+    //                if (resolvableConstructor == ResolvableConstructor.NoPublicConstructorOrNoConstructor)
+    //                    throw new ArgumentException(String.Format("Cannot Resolve: No constructor or not public constructor for type {0}", interfaceType.FullName));
+    //                if (resolvableConstructor == ResolvableConstructor.NoResolvableConstructor)
+    //                    throw new ArgumentException(String.Format("Cannot Resolve: No resolvable constructor for type {0}", interfaceType.FullName));
+    //                if (resolvableConstructor == ResolvableConstructor.CyclicDependencyConstructor)
+    //                    throw new ArgumentException(String.Format("Cannot Resolve: Cyclic dependency detected for type {0}", interfaceType.FullName));
+    //                // Create instance
+    //                try
+    //                {
+    //                    resolved = resolvableConstructor.Resolve(_instances, _factories);
+    //                }
+    //                catch (InvalidOperationException ex)
+    //                {
+    //                    throw new InvalidOperationException("Cannot Resolve: See innerException", ex);
+    //                }
+    //            }
+    //        }
+    //        return (TInterface)resolved;
+    //    }
+
+    //    public TInterface Resolve<TInterface>(IEnumerable<ParameterValue> parameters)
+    //        where TInterface : class
+    //    {
+    //        Type interfaceType = typeof(TInterface);
+
+    //        if (!interfaceType.IsInterface)
+    //            throw new ArgumentException("Cannot Resolve: Only an interface can be resolved");
+
+    //        object resolved;
+    //        lock (_lockObject)
+    //        {
+    //            if (!_interfaceToImplementationMap.ContainsKey(interfaceType))
+    //                throw new ArgumentException(String.Format("Cannot Resolve: No registration found for interface {0}", interfaceType.FullName));
+
+    //            // Search in registered instances
+    //            if (_instances.ContainsKey(interfaceType))
+    //                resolved = _instances[interfaceType];
+    //            else
+    //            {
+    //                // Create resolvable constructor
+    //                List<ParameterValue> userDefinedParameters = parameters.ToList();
+    //                ResolvableConstructor resolvableConstructor = BuildResolvableConstructor(interfaceType, userDefinedParameters);
+    //                if (resolvableConstructor == ResolvableConstructor.TypeNotRegistered)
+    //                    throw new ArgumentException(String.Format("Cannot Resolve: No registration found for type {0}", interfaceType.FullName));
+    //                if (resolvableConstructor == ResolvableConstructor.NoPublicConstructorOrNoConstructor)
+    //                    throw new ArgumentException(String.Format("Cannot Resolve: No constructor or not public constructor for type {0}", interfaceType.FullName));
+    //                if (resolvableConstructor == ResolvableConstructor.NoResolvableConstructor)
+    //                    throw new ArgumentException(String.Format("Cannot Resolve: No resolvable constructor for type {0}", interfaceType.FullName));
+    //                if (resolvableConstructor == ResolvableConstructor.CyclicDependencyConstructor)
+    //                    throw new ArgumentException(String.Format("Cannot Resolve: Cyclic dependency detected for type {0}", interfaceType.FullName));
+    //                // Create instance
+    //                try
+    //                {
+    //                    resolved = resolvableConstructor.Resolve(_instances, _factories);
+    //                }
+    //                catch (InvalidOperationException ex)
+    //                {
+    //                    throw new InvalidOperationException("Cannot Resolve: See innerException", ex);
+    //                }
+    //            }
+    //        }
+    //        return (TInterface)resolved;
+    //    }
+
+    //    public void Reset()
+    //    {
+    //        lock (_lockObject)
+    //        {
+    //            _interfaceToImplementationMap.Clear();
+    //            _factories.Clear();
+    //            _instances.Clear();
+    //            _resolvableConstructors.Clear();
+    //        }
+    //    }
+
+    //    #endregion
+
+    //    // Following methods are NOT responsible for locking collections
+    //    private interface IResolvableParameter
+    //    {
+    //        object Resolve(IDictionary<Type, object> instances, IDictionary<Type, Func<object>> factories);
+    //    }
+
+    //    private class UserDefinedParameter : IResolvableParameter
+    //    {
+    //        public ParameterValue ParameterValue { get; set; }
+
+    //        public object Resolve(IDictionary<Type, object> instances, IDictionary<Type, Func<object>> factories)
+    //        {
+    //            return ParameterValue.Value;
+    //        }
+    //    }
+
+    //    private class ResolvableConstructor : IResolvableParameter
+    //    {
+    //        public static readonly ResolvableConstructor TypeNotRegistered = new ResolvableConstructor();
+    //        public static readonly ResolvableConstructor NoPublicConstructorOrNoConstructor = new ResolvableConstructor();
+    //        public static readonly ResolvableConstructor NoResolvableConstructor = new ResolvableConstructor();
+    //        public static readonly ResolvableConstructor CyclicDependencyConstructor = new ResolvableConstructor();
+
+    //        public Type InterfaceType { private get; set; }
+    //        //public Type ImplementationType { private get; set; }
+    //        public ConstructorInfo ConstructorInfo { private get; set; }
+    //        public List<IResolvableParameter> Parameters { private get; set; }
+
+    //        public bool IsValid
+    //        {
+    //            get { return this != TypeNotRegistered && this != NoPublicConstructorOrNoConstructor && this != NoResolvableConstructor && this != CyclicDependencyConstructor; }
+    //        }
+
+    //        public object Resolve(IDictionary<Type, object> instances, IDictionary<Type, Func<object>> factories)
+    //        {
+    //            if (ConstructorInfo == null)
+    //                throw new InvalidOperationException("No constructor info found");
+
+    //            // If parameterless, create instance
+    //            if (Parameters == null)
+    //            {
+    //                // Search in registered instances
+    //                if (instances.ContainsKey(InterfaceType))
+    //                    return instances[InterfaceType];
+    //                return ConstructorInfo.Invoke(null);
+    //            }
+
+    //            // If parameters, recursively create parameters instance
+    //            object[] parameters = new object[Parameters.Count];
+    //            for (int i = 0; i < Parameters.Count; i++)
+    //            {
+    //                IResolvableParameter unspecializedParameter = Parameters[i];
+
+    //                if (unspecializedParameter is UserDefinedParameter)
+    //                    parameters[i] = (unspecializedParameter as UserDefinedParameter).ParameterValue.Value;
+    //                else if (unspecializedParameter is ResolvableConstructor)
+    //                {
+    //                    ResolvableConstructor parameter = unspecializedParameter as ResolvableConstructor;
+
+    //                    // Search in registered instances
+    //                    if (instances.ContainsKey(parameter.InterfaceType))
+    //                        parameters[i] = instances[parameter.InterfaceType];
+    //                    else
+    //                    {
+    //                        object parameterInstance;
+    //                        // Use factory is any registered for parameter type
+    //                        if (factories.ContainsKey(parameter.InterfaceType))
+    //                        {
+    //                            Func<object> factory = factories[parameter.InterfaceType];
+    //                            parameterInstance = factory.DynamicInvoke(null);
+    //                        }
+    //                        else
+    //                            // Recursively resolve parameter
+    //                            parameterInstance = unspecializedParameter.Resolve(instances, factories);
+    //                        parameters[i] = parameterInstance;
+    //                    }
+    //                }
+
+    //            }
+    //            // and create instance using parameters
+    //            return ConstructorInfo.Invoke(parameters);
+    //        }
+    //    }
+
+    //    private ResolvableConstructor BuildResolvableConstructor(Type interfaceType, List<ParameterValue> userDefinedParameters = null)
+    //    {
+    //        List<Type> discoveredTypes = new List<Type>
+    //            {
+    //                interfaceType
+    //            };
+    //        return InnerBuildResolvableConstructor(interfaceType, discoveredTypes, userDefinedParameters);
+    //    }
+
+    //    private ResolvableConstructor InnerBuildResolvableConstructor(Type interfaceType, ICollection<Type> discoveredTypes, List<ParameterValue> userDefinedParameters = null)
+    //    {
+    //        if (!_interfaceToImplementationMap.ContainsKey(interfaceType))
+    //            return ResolvableConstructor.TypeNotRegistered;
+
+    //        Type implementationType = _interfaceToImplementationMap[interfaceType];
+
+    //        ConstructorInfo[] constructorInfos = implementationType.GetConstructors();
+
+    //        if (constructorInfos.Length == 0
+    //            || (constructorInfos.Length == 1 && !constructorInfos[0].IsPublic))
+    //            return ResolvableConstructor.NoPublicConstructorOrNoConstructor;
+
+    //        // Get parameters for each ctor
+    //        var constructorAndParameters = constructorInfos.Select(x => new
+    //        {
+    //            Constructor = x,
+    //            Parameters = x.GetParameters()
+    //        }).ToList();
+
+    //        // Get first parameterless if any
+    //        var parameterless = constructorAndParameters.FirstOrDefault(x => x.Parameters.Length == 0);
+    //        if (parameterless != null)
+    //            return new ResolvableConstructor
+    //            {
+    //                InterfaceType = interfaceType,
+    //                //ImplementationType = implementationType, NOT USED
+    //                ConstructorInfo = parameterless.Constructor,
+    //                // No parameters
+    //            };
+
+    //        // Check if every ctor's parameter is registered in container or resolvable, returns first resolvable
+    //        foreach (var c in constructorAndParameters)
+    //        {
+    //            List<IResolvableParameter> parametersResolvableConstructor = new List<IResolvableParameter>(c.Parameters.Length);
+
+    //            bool ok = true;
+    //            foreach (ParameterInfo parameterInfo in c.Parameters)
+    //            {
+    //                if (userDefinedParameters != null && userDefinedParameters.Any(x => x.Name == parameterInfo.Name))
+    //                {
+    //                    ParameterValue parameterValue = userDefinedParameters.First(x => x.Name == parameterInfo.Name);
+
+    //                    IResolvableParameter parameter = new UserDefinedParameter
+    //                    {
+    //                        ParameterValue = parameterValue
+    //                    };
+    //                    parametersResolvableConstructor.Add(parameter);
+    //                }
+    //                else
+    //                {
+    //                    if (discoveredTypes.Any(x => x == parameterInfo.ParameterType)) // check cyclic dependency
+    //                    {
+    //                        ok = false;
+    //                        break;
+    //                    }
+
+    //                    discoveredTypes.Add(parameterInfo.ParameterType);
+    //                    ResolvableConstructor parameterResolvableConstructor = InnerBuildResolvableConstructor(parameterInfo.ParameterType, discoveredTypes);
+    //                    discoveredTypes.Remove(interfaceType);
+
+    //                    if (!parameterResolvableConstructor.IsValid) // once an invalid ctor parameter has been found, try next ctor
+    //                    {
+    //                        ok = false;
+    //                        break;
+    //                    }
+    //                    parametersResolvableConstructor.Add(parameterResolvableConstructor);
+    //                }
+
+    //            }
+
+    //            if (ok)
+    //                return new ResolvableConstructor
+    //                {
+    //                    InterfaceType = interfaceType,
+    //                    //ImplementationType = implementationType, NOT USED
+    //                    ConstructorInfo = c.Constructor,
+    //                    Parameters = parametersResolvableConstructor
+    //                };
+    //        }
+
+    //        //
+    //        return ResolvableConstructor.NoResolvableConstructor;
+    //    }
+    //}
 }

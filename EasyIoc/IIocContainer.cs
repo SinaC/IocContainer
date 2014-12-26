@@ -10,7 +10,7 @@ namespace EasyIoc
 
         void RegisterType<TInterface, TImplementation>()
             where TInterface : class
-            where TImplementation : class;
+            where TImplementation : class, TInterface;
 
         void RegisterFactory<TInterface>(Func<TInterface> createFunc)
             where TInterface : class;
@@ -19,6 +19,15 @@ namespace EasyIoc
             where TInterface : class;
 
         void Unregister<TInterface>()
+            where TInterface : class;
+
+        void UnregisterType<TInterface>()
+            where TInterface : class;
+
+        void UnregisterFactory<TInterface>()
+            where TInterface : class;
+        
+        void UnregisterInstance<TInterface>()
             where TInterface : class;
 
         TInterface Resolve<TInterface>()
