@@ -118,4 +118,16 @@
             Interface1 = interface1;
         }
     }
+
+    public class TestClass2ImplementingInterface3 : ITestInterface3
+    {
+        public ITestInterface1 Interface1 { get; private set; }
+        public ITestInterface2 Interface2 { get; private set; }
+
+        public TestClass2ImplementingInterface3(ITestInterface1 interface1, ITestInterface2 interface2)
+        {
+            Interface1 = interface1;
+            Interface2 = interface2;
+        }
+    }
 }

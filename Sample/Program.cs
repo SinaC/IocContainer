@@ -8,8 +8,8 @@ namespace Sample
         {
             IocContainer.Default.RegisterType<ITestInterface1, TestClass6ImplementatingInterface1>();
             IocContainer.Default.RegisterType<ITestInterface2, TestClass1ImplementingInterface2>();
-            IocContainer.Default.RegisterType<ITestInterface3, TestClass1ImplementingInterface3>();
-            IocContainer.Default.RegisterFactory<ITestInterface3>(() => new TestClass1ImplementingInterface3());
+            //IocContainer.Default.RegisterType<ITestInterface3, TestClass1ImplementingInterface3>();
+            //IocContainer.Default.RegisterFactory<ITestInterface3>(() => new TestClass1ImplementingInterface3());
             IocContainer.Default.RegisterInstance<ITestInterface3>(new TestClass1ImplementingInterface3());
             //container.RegisterType<ITestInterface1, TestClass7ImplementatingInterface1>();
 

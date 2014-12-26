@@ -668,6 +668,34 @@ namespace EasyIocTest
             Assert.IsNotNull(((instance as TestClass1ImplementingInterface3).Interface2 as TestClass3ImplementingInterface2).Interface1);
             Assert.IsInstanceOfType(((instance as TestClass1ImplementingInterface3).Interface2 as TestClass3ImplementingInterface2).Interface1, typeof(TestClass2ImplementingInterface1));
         }
+
+        [TestMethod]
+        public void TestResolveScenario5()
+        {
+            IocContainer.Default.RegisterType<ITestInterface3, TestClass2ImplementingInterface3>();
+            IocContainer.Default.RegisterType<ITestInterface2, TestClass3ImplementingInterface2>();
+            IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
+
+            ITestInterface3 instance = IocContainer.Default.Resolve<ITestInterface3>();
+
+            Assert.IsNotNull(instance);
+            Assert.IsInstanceOfType(instance, typeof(TestClass2ImplementingInterface3));
+            Assert.IsNotNull((instance as TestClass2ImplementingInterface3).Interface1);
+            Assert.IsNotNull((instance as TestClass2ImplementingInterface3).Interface2);
+            Assert.IsInstanceOfType((instance as TestClass2ImplementingInterface3).Interface1, typeof(TestClass1ImplementingInterface1));
+            Assert.IsInstanceOfType((instance as TestClass2ImplementingInterface3).Interface2, typeof(TestClass3ImplementingInterface2));
+            Assert.IsNotNull(((instance as TestClass2ImplementingInterface3).Interface2 as TestClass3ImplementingInterface2).Interface1);
+            Assert.IsInstanceOfType(((instance as TestClass2ImplementingInterface3).Interface2 as TestClass3ImplementingInterface2).Interface1, typeof(TestClass1ImplementingInterface1));
+        }
+
+        [TestMethod]
+        public void TestParameterValue()
+        {
+            ParameterValue value = new ParameterValue("parameter", this);
+
+            Assert.AreEqual(value.Name, "parameter");
+            Assert.AreEqual(value.Value, this);
+        }
     }
 }
 

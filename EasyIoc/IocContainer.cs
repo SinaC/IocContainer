@@ -448,7 +448,7 @@ namespace EasyIoc
 
                         discoveredTypes.Add(parameterInfo.ParameterType); // add parameter type to discovered type
                         ResolveNodeBase parameter = InnerBuildResolveTree(parameterInfo.ParameterType, discoveredTypes, userDefinedParameters);
-                        discoveredTypes.Remove(interfaceType); // remove parameter type from discovered type
+                        discoveredTypes.Remove(parameterInfo.ParameterType); // remove parameter type from discovered type
 
                         if (parameter is ErrorNode) // once an invalid ctor parameter has been found, try next ctor
                         {
@@ -457,7 +457,6 @@ namespace EasyIoc
                         }
                         parametersResolvable.Add(parameter);
                     }
-
                 }
 
                 if (ok)
@@ -861,7 +860,7 @@ namespace EasyIoc
 
     //                    discoveredTypes.Add(parameterInfo.ParameterType);
     //                    ResolvableConstructor parameterResolvableConstructor = InnerBuildResolvableConstructor(parameterInfo.ParameterType, discoveredTypes);
-    //                    discoveredTypes.Remove(interfaceType);
+    //                    discoveredTypes.Remove(parameterInfo.ParameterType);
 
     //                    if (!parameterResolvableConstructor.IsValid) // once an invalid ctor parameter has been found, try next ctor
     //                    {
