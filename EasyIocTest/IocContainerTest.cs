@@ -11,6 +11,7 @@ namespace EasyIocTest
         public void Initialize()
         {
             IocContainer.Default.Reset();
+            CountCall.Reset();
         }
 
         [TestMethod]
@@ -307,142 +308,6 @@ namespace EasyIocTest
         }
 
         [TestMethod]
-        public void TestResolveSingleInstanceOnRegisterInstance()
-        {
-            IocContainer.Default.RegisterInstance<ITestInterface1>(new TestClass1ImplementingInterface1());
-
-            ITestInterface1 instance1 = IocContainer.Default.Resolve<ITestInterface1>();
-            ITestInterface1 instance2 = IocContainer.Default.Resolve<ITestInterface1>();
-
-            Assert.AreEqual(instance1, instance2);
-        }
-
-        [TestMethod]
-        public void TestResolveMultipleInstanceOnRegisterType()
-        {
-            IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
-
-            ITestInterface1 instance1 = IocContainer.Default.Resolve<ITestInterface1>();
-            ITestInterface1 instance2 = IocContainer.Default.Resolve<ITestInterface1>();
-
-            Assert.AreNotEqual(instance1, instance2);
-        }
-
-        [TestMethod]
-        public void TestResolveReturnsRegisteredInstance()
-        {
-            ITestInterface1 instance0 = new TestClass1ImplementingInterface1();
-            IocContainer.Default.RegisterInstance(instance0);
-
-            ITestInterface1 instance1 = IocContainer.Default.Resolve<ITestInterface1>();
-            ITestInterface1 instance2 = IocContainer.Default.Resolve<ITestInterface1>();
-
-            Assert.AreEqual(instance0, instance1);
-            Assert.AreEqual(instance1, instance2);
-        }
-
-        [TestMethod]
-        public void TestResolveWithoutPublicConstructor()
-        {
-            IocContainer.Default.RegisterType<ITestInterface1, TestClass4ImplementingInterface1>();
-
-            try
-            {
-                ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>();
-
-                Assert.Fail("Exception not thrown");
-            }
-            catch (ArgumentException)
-            {
-                Assert.IsTrue(true);
-            }
-        }
-
-        [TestMethod]
-        public void TestResolveWithComplexConstructor()
-        {
-            IocContainer.Default.RegisterType<ITestInterface1, TestClass3ImplementingInterface1>();
-
-            try
-            {
-                ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>();
-
-                Assert.Fail("Exception not thrown");
-            }
-            catch (ArgumentException)
-            {
-                Assert.IsTrue(true);
-            }
-        }
-
-        [TestMethod]
-        public void TestResolveWithRegisterInstanceAndComplexConstructor()
-        {
-            IocContainer.Default.RegisterInstance<ITestInterface1>(new TestClass3ImplementingInterface1(5));
-
-            ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>();
-
-            Assert.IsNotNull(instance);
-        }
-
-        [TestMethod]
-        public void TestResolveWithRegisterInstanceAndNoPublicConstructor()
-        {
-            IocContainer.Default.RegisterInstance<ITestInterface1>(new TestClass5ImplementingInterface1());
-
-            ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>();
-
-            Assert.IsNotNull(instance);
-        }
-
-        [TestMethod]
-        public void TestResolveSimpleCyclicDependency()
-        {
-            IocContainer.Default.RegisterType<ITestInterface2, TestClass4ImplementingInterface2>();
-
-            try
-            {
-                ITestInterface2 instance = IocContainer.Default.Resolve<ITestInterface2>();
-
-                Assert.Fail("Exception not thrown");
-            }
-            catch (ArgumentException ex)
-            {
-                Assert.IsTrue(true);
-            }
-        }
-
-        [TestMethod]
-        public void TestResolveComplexCyclicDependency()
-        {
-            IocContainer.Default.RegisterType<ITestInterface1, TestClass6ImplementingInterface1>();
-            IocContainer.Default.RegisterType<ITestInterface2, TestClass3ImplementingInterface2>();
-
-            try
-            {
-                ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>();
-
-                Assert.Fail("Exception not thrown");
-            }
-            catch (ArgumentException ex)
-            {
-                Assert.IsTrue(true);
-            }
-        }
-
-        [TestMethod]
-        public void TestResolveReallyComplexCyclicDependency()
-        {
-            IocContainer.Default.RegisterType<ITestInterface1, TestClass5ImplementingInterface1>();
-            IocContainer.Default.RegisterType<ITestInterface2, TestClass5ImplementingInterface2>();
-            IocContainer.Default.RegisterType<ITestInterface3, TestClass1ImplementingInterface3>();
-
-            ITestInterface3 instance = IocContainer.Default.Resolve<ITestInterface3>();
-
-            Assert.IsNotNull(instance);
-        }
-
-        [TestMethod]
         public void TestUnregister()
         {
             IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
@@ -514,7 +379,165 @@ namespace EasyIocTest
 
                 Assert.Fail("Exception not raised");
             }
-            catch(ArgumentException)
+            catch (ArgumentException)
+            {
+                Assert.IsTrue(true);
+            }
+        }
+
+        [TestMethod]
+        public void TestResolveSingleInstanceOnRegisterInstance()
+        {
+            IocContainer.Default.RegisterInstance<ITestInterface1>(new TestClass7ImplementingInterface1());
+
+            ITestInterface1 instance1 = IocContainer.Default.Resolve<ITestInterface1>();
+            ITestInterface1 instance2 = IocContainer.Default.Resolve<ITestInterface1>();
+
+            Assert.AreEqual(instance1, instance2);
+            Assert.AreEqual(CountCall.Count("TestClass7ImplementingInterface1"), 1);
+        }
+
+        [TestMethod]
+        public void TestResolveMultipleInstanceOnRegisterType()
+        {
+            IocContainer.Default.RegisterType<ITestInterface1, TestClass7ImplementingInterface1>();
+
+            ITestInterface1 instance1 = IocContainer.Default.Resolve<ITestInterface1>();
+            ITestInterface1 instance2 = IocContainer.Default.Resolve<ITestInterface1>();
+
+            Assert.AreNotEqual(instance1, instance2);
+            Assert.AreEqual(CountCall.Count("TestClass7ImplementingInterface1"), 2);
+        }
+
+        [TestMethod]
+        public void TestResolveReturnsRegisteredInstance()
+        {
+            ITestInterface1 instance0 = new TestClass1ImplementingInterface1();
+            IocContainer.Default.RegisterInstance(instance0);
+
+            ITestInterface1 instance1 = IocContainer.Default.Resolve<ITestInterface1>();
+            ITestInterface1 instance2 = IocContainer.Default.Resolve<ITestInterface1>();
+
+            Assert.AreEqual(instance0, instance1);
+            Assert.AreEqual(instance1, instance2);
+        }
+
+        [TestMethod]
+        public void TestResolveWithoutPublicConstructor()
+        {
+            IocContainer.Default.RegisterType<ITestInterface1, TestClass4ImplementingInterface1>();
+
+            try
+            {
+                ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>();
+
+                Assert.Fail("Exception not thrown");
+            }
+            catch (ArgumentException)
+            {
+                Assert.IsTrue(true);
+            }
+        }
+
+        [TestMethod]
+        public void TestResolveWithComplexConstructor()
+        {
+            IocContainer.Default.RegisterType<ITestInterface1, TestClass3ImplementingInterface1>();
+
+            try
+            {
+                ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>();
+
+                Assert.Fail("Exception not thrown");
+            }
+            catch (ArgumentException)
+            {
+                Assert.IsTrue(true);
+            }
+        }
+
+        [TestMethod]
+        public void TestResolveWithRegisterInstanceAndComplexConstructor()
+        {
+            IocContainer.Default.RegisterInstance<ITestInterface1>(new TestClass3ImplementingInterface1(5));
+
+            ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>();
+
+            Assert.IsNotNull(instance);
+        }
+
+        [TestMethod]
+        public void TestResolveWithRegisterInstanceAndNoPublicConstructor()
+        {
+            IocContainer.Default.RegisterInstance<ITestInterface1>(new TestClass5ImplementingInterface1());
+
+            ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>();
+
+            Assert.IsNotNull(instance);
+        }
+
+        [TestMethod]
+        public void TestResolveManyConstructors()
+        {
+            IocContainer.Default.RegisterType<ITestInterface1, TestClass5ImplementingInterface1>();
+            IocContainer.Default.RegisterType<ITestInterface2, TestClass5ImplementingInterface2>();
+            IocContainer.Default.RegisterType<ITestInterface3, TestClass1ImplementingInterface3>();
+
+            ITestInterface3 instance = IocContainer.Default.Resolve<ITestInterface3>(); // Will resolve using ctor TestClass1ImplementingInterface3(ITestInterface1 interface1)
+
+            Assert.IsNotNull(instance);
+        }
+
+        [TestMethod]
+        public void TestResolveSimpleCyclicDependency()
+        {
+            IocContainer.Default.RegisterType<ITestInterface2, TestClass4ImplementingInterface2>();
+
+            try
+            {
+                ITestInterface2 instance = IocContainer.Default.Resolve<ITestInterface2>();
+
+                Assert.Fail("Exception not thrown");
+            }
+            catch (ArgumentException ex)
+            {
+                Assert.IsTrue(true);
+            }
+        }
+
+        [TestMethod]
+        public void TestResolveComplexCyclicDependency()
+        {
+            IocContainer.Default.RegisterType<ITestInterface1, TestClass6ImplementingInterface1>();
+            IocContainer.Default.RegisterType<ITestInterface2, TestClass3ImplementingInterface2>();
+
+            try
+            {
+                ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>();
+
+                Assert.Fail("Exception not thrown");
+            }
+            catch (ArgumentException ex)
+            {
+                Assert.IsTrue(true);
+            }
+        }
+
+        [TestMethod]
+        public void TestResolveReallyComplexCyclicDependency()
+        {
+            IocContainer.Default.RegisterType<ITestInterface1, TestClass5ImplementingInterface1>();
+            IocContainer.Default.RegisterType<ITestInterface2, TestClass5ImplementingInterface2>();
+            IocContainer.Default.RegisterType<ITestInterface3, TestClass2ImplementingInterface3>();
+
+            try
+            {
+                ITestInterface3 instance = IocContainer.Default.Resolve<ITestInterface3>();
+
+                Assert.IsNotNull(instance);
+                Assert.Fail("Exception not thrown");
+            }
+            catch (ArgumentException ex)
             {
                 Assert.IsTrue(true);
             }
@@ -596,6 +619,17 @@ namespace EasyIocTest
         }
 
         [TestMethod]
+        public void TestRegisterDeeperInheriting()
+        {
+            IocContainer.Default.RegisterType<ITestInterface1, TestClass5ImplementingInterface1>();
+
+            ITestInterface1 instance = IocContainer.Default.Resolve<ITestInterface1>();
+
+            Assert.IsNotNull(instance);
+            Assert.IsInstanceOfType(instance, typeof(TestClass5ImplementingInterface1));
+        }
+
+        [TestMethod]
         public void TestResolveScenario1()
         {
             IocContainer.Default.RegisterFactory<ITestInterface1>(() => new TestClass2ImplementingInterface1());
@@ -603,7 +637,9 @@ namespace EasyIocTest
 
             ITestInterface2 instance = IocContainer.Default.Resolve<ITestInterface2>();
 
+            Assert.IsNotNull(instance);
             Assert.IsInstanceOfType(instance, typeof (TestClass3ImplementingInterface2));
+            Assert.IsNotNull((instance as TestClass3ImplementingInterface2).Interface1);
             Assert.IsInstanceOfType((instance as TestClass3ImplementingInterface2).Interface1, typeof (TestClass2ImplementingInterface1));
         }
 
@@ -655,7 +691,7 @@ namespace EasyIocTest
         {
             IocContainer.Default.RegisterType<ITestInterface3, TestClass1ImplementingInterface3>();
             IocContainer.Default.RegisterType<ITestInterface2, TestClass3ImplementingInterface2>();
-            IocContainer.Default.RegisterFactory<ITestInterface1>(() => new TestClass2ImplementingInterface1());
+            IocContainer.Default.RegisterFactory<ITestInterface1>(() => new TestClass7ImplementingInterface1());
 
             ITestInterface3 instance = IocContainer.Default.Resolve<ITestInterface3>();
 
@@ -666,7 +702,11 @@ namespace EasyIocTest
             Assert.IsNull((instance as TestClass1ImplementingInterface3).Interface3);
             Assert.IsInstanceOfType((instance as TestClass1ImplementingInterface3).Interface2, typeof(TestClass3ImplementingInterface2));
             Assert.IsNotNull(((instance as TestClass1ImplementingInterface3).Interface2 as TestClass3ImplementingInterface2).Interface1);
-            Assert.IsInstanceOfType(((instance as TestClass1ImplementingInterface3).Interface2 as TestClass3ImplementingInterface2).Interface1, typeof(TestClass2ImplementingInterface1));
+            Assert.IsInstanceOfType(((instance as TestClass1ImplementingInterface3).Interface2 as TestClass3ImplementingInterface2).Interface1, typeof(TestClass7ImplementingInterface1));
+
+            Assert.AreEqual(CountCall.Count("TestClass7ImplementingInterface1"), 1); // TestClass3ImplementingInterface2(ITestInterface1 interface1)
+            Assert.AreEqual(CountCall.Count("TestClass3ImplementingInterface2"), 1); // TestClass1ImplementingInterface3(ITestInterface2 interface2)
+            Assert.AreEqual(CountCall.Count("TestClass1ImplementingInterface3"), 1); //
         }
 
         [TestMethod]
@@ -674,7 +714,7 @@ namespace EasyIocTest
         {
             IocContainer.Default.RegisterType<ITestInterface3, TestClass2ImplementingInterface3>();
             IocContainer.Default.RegisterType<ITestInterface2, TestClass3ImplementingInterface2>();
-            IocContainer.Default.RegisterType<ITestInterface1, TestClass1ImplementingInterface1>();
+            IocContainer.Default.RegisterType<ITestInterface1, TestClass7ImplementingInterface1>();
 
             ITestInterface3 instance = IocContainer.Default.Resolve<ITestInterface3>();
 
@@ -682,10 +722,13 @@ namespace EasyIocTest
             Assert.IsInstanceOfType(instance, typeof(TestClass2ImplementingInterface3));
             Assert.IsNotNull((instance as TestClass2ImplementingInterface3).Interface1);
             Assert.IsNotNull((instance as TestClass2ImplementingInterface3).Interface2);
-            Assert.IsInstanceOfType((instance as TestClass2ImplementingInterface3).Interface1, typeof(TestClass1ImplementingInterface1));
+            Assert.IsInstanceOfType((instance as TestClass2ImplementingInterface3).Interface1, typeof(TestClass7ImplementingInterface1));
             Assert.IsInstanceOfType((instance as TestClass2ImplementingInterface3).Interface2, typeof(TestClass3ImplementingInterface2));
             Assert.IsNotNull(((instance as TestClass2ImplementingInterface3).Interface2 as TestClass3ImplementingInterface2).Interface1);
-            Assert.IsInstanceOfType(((instance as TestClass2ImplementingInterface3).Interface2 as TestClass3ImplementingInterface2).Interface1, typeof(TestClass1ImplementingInterface1));
+            Assert.IsInstanceOfType(((instance as TestClass2ImplementingInterface3).Interface2 as TestClass3ImplementingInterface2).Interface1, typeof(TestClass7ImplementingInterface1));
+            Assert.AreEqual(CountCall.Count("TestClass7ImplementingInterface1"), 2); // TestClass2ImplementingInterface3 + TestClass3ImplementingInterface2
+            Assert.AreEqual(CountCall.Count("TestClass3ImplementingInterface2"), 1); // TestClass2ImplementingInterface3
+            Assert.AreEqual(CountCall.Count("TestClass2ImplementingInterface3"), 1); //
         }
 
         [TestMethod]

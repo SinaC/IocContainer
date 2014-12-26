@@ -8,10 +8,8 @@ namespace Sample
         {
             IocContainer.Default.RegisterType<ITestInterface1, TestClass6ImplementatingInterface1>();
             IocContainer.Default.RegisterType<ITestInterface2, TestClass1ImplementingInterface2>();
-            //IocContainer.Default.RegisterType<ITestInterface3, TestClass1ImplementingInterface3>();
-            //IocContainer.Default.RegisterFactory<ITestInterface3>(() => new TestClass1ImplementingInterface3());
-            IocContainer.Default.RegisterInstance<ITestInterface3>(new TestClass1ImplementingInterface3());
-            //container.RegisterType<ITestInterface1, TestClass7ImplementatingInterface1>();
+            //IocContainer.Default.RegisterInstance<ITestInterface3>(new TestClass1ImplementingInterface3());
+            IocContainer.Default.RegisterType<ITestInterface3,TestClass1ImplementingInterface3>();
 
             ITestInterface1 info = IocContainer.Default.Resolve<ITestInterface1>();
         }
@@ -25,8 +23,8 @@ namespace Sample
     {
         private static int _count = 0;
 
-        public ITestInterface2 TestInterface2 { get; set; }
-        public ITestInterface3 TestInterface3 { get; set; }
+        public ITestInterface2 TestInterface2 { get; private set; }
+        public ITestInterface3 TestInterface3 { get; private set; }
 
         public TestClass6ImplementatingInterface1(ITestInterface2 interface2, ITestInterface3 interface3)
         {
@@ -41,7 +39,7 @@ namespace Sample
     {
         private static int _count = 0;
 
-        public int X { get; set; }
+        public int X { get; private set; }
 
         public TestClass7ImplementatingInterface1(int x)
         {
@@ -59,7 +57,7 @@ namespace Sample
     {
         private static int _count = 0;
 
-        public ITestInterface3 TestInterface3 { get; set; }
+        public ITestInterface3 TestInterface3 { get; private set; }
 
         public TestClass1ImplementingInterface2(ITestInterface3 interface3)
         {
