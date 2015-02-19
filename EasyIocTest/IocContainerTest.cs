@@ -661,6 +661,7 @@ namespace EasyIocTest
             Assert.IsNotNull(((instance as TestClass1ImplementingInterface3).Interface2 as TestClass3ImplementingInterface2).Interface1);
             Assert.IsInstanceOfType(((instance as TestClass1ImplementingInterface3).Interface2 as TestClass3ImplementingInterface2).Interface1, typeof (TestClass3ImplementingInterface1));
             Assert.AreEqual((((instance as TestClass1ImplementingInterface3).Interface2 as TestClass3ImplementingInterface2).Interface1 as TestClass3ImplementingInterface1).X, 7);
+            Assert.AreEqual(CountCall.Count("TestClass3ImplementingInterface1"), 1);
         }
 
         [TestMethod]

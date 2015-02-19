@@ -233,7 +233,7 @@ namespace EasyIoc
             object resolved;
             lock (_lockObject)
             {
-                // Don't search in resolvable constructor cache: ResolveTree may be different with or without parameters
+                // Don't search in resolve tree cache: ResolveTree may be different with or without parameters
                 // Create resolve tree
                 List<ParameterValue> parametersList = parameters == null ? null : parameters.ToList();
                 ResolveNodeBase resolveTree = BuildResolveTree(interfaceType, parametersList);
