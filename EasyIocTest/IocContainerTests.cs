@@ -5,7 +5,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace EasyIocTest
 {
     [TestClass]
-    public class IocContainerTest
+    public class IocContainerTests
     {
         [TestInitialize]
         public void Initialize()
