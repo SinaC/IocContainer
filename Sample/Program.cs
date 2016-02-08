@@ -6,13 +6,43 @@ namespace Sample
     {
         static void Main(string[] args)
         {
-            IocContainer.Default.RegisterType<ITestInterface1, TestClass6ImplementatingInterface1>();
-            IocContainer.Default.RegisterType<ITestInterface2, TestClass1ImplementingInterface2>();
+            //IocContainer.Default.RegisterType<ITestInterface1, TestClass6ImplementatingInterface1>();
+            //IocContainer.Default.RegisterType<ITestInterface2, TestClass1ImplementingInterface2>();
+            ////IocContainer.Default.RegisterInstance<ITestInterface3>(new TestClass1ImplementingInterface3());
+            ////IocContainer.Default.RegisterType<ITestInterface3,TestClass1ImplementingInterface3>();
             //IocContainer.Default.RegisterInstance<ITestInterface3>(new TestClass1ImplementingInterface3());
-            //IocContainer.Default.RegisterType<ITestInterface3,TestClass1ImplementingInterface3>();
-            IocContainer.Default.RegisterInstance<ITestInterface3>(new TestClass1ImplementingInterface3());
 
-            ITestInterface1 info = IocContainer.Default.Resolve<ITestInterface1>();
+            //ITestInterface1 info = IocContainer.Default.Resolve<ITestInterface1>();
+
+            //IocContainer.Default.RegisterType<ITestInterfaceMultiple1, TestClassImplemententingMultiple1AndMultiple2>();
+            //IocContainer.Default.RegisterType<ITestInterfaceMultiple2, TestClassImplemententingMultiple1AndMultiple2>();
+            //ITestInterfaceMultiple1 i1 = IocContainer.Default.Resolve<ITestInterfaceMultiple1>();
+            //ITestInterfaceMultiple2 i2 = IocContainer.Default.Resolve<ITestInterfaceMultiple2>();
+            IocContainer.Default.RegisterInstance<ITestInterfaceMultiple1>(new TestClassImplemententingMultiple1AndMultiple2());
+            IocContainer.Default.RegisterInstance<ITestInterfaceMultiple2>(new TestClassImplemententingMultiple1AndMultiple2());
+
+            ITestInterfaceMultiple1 i1 = IocContainer.Default.Resolve<ITestInterfaceMultiple1>();
+            ITestInterfaceMultiple2 i2 = IocContainer.Default.Resolve<ITestInterfaceMultiple2>();
+        }
+    }
+
+    public interface ITestInterfaceMultiple1
+    {
+    }
+
+    public interface ITestInterfaceMultiple2
+    {
+    }
+
+    public class TestClassImplemententingMultiple1AndMultiple2 : ITestInterfaceMultiple1, ITestInterfaceMultiple2
+    {
+        private int _id;
+        private static int _count = 0;
+
+        public TestClassImplemententingMultiple1AndMultiple2()
+        {
+            _id = _count;
+            _count++;
         }
     }
 
