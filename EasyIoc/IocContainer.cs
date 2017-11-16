@@ -3,24 +3,20 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
-// Unless a specific instance has been registered via RegisterInstance, every Resolve will create a new instance
-
 namespace EasyIoc
 {
     public sealed class IocContainer : IIocContainer
     {
-        private readonly Dictionary<Type, Type> _implementations = new Dictionary<Type, Type>(); // registrered with RegisterType
-        private readonly Dictionary<Type, Func<object>> _factories = new Dictionary<Type, Func<object>>(); // registered with RegisterFactory
-        private readonly Dictionary<Type, object> _instances = new Dictionary<Type, object>(); // registered with RegisterInstance
-        private readonly Dictionary<Type, ResolveNodeBase> _resolveTrees = new Dictionary<Type, ResolveNodeBase>();
+        private readonly Dictionary<Type, AnonymousNamedEntity<Type>> _implementations = new Dictionary<Type, AnonymousNamedEntity<Type>>();
+        private readonly Dictionary<Type, AnonymousNamedEntity<object>> _instances = new Dictionary<Type, AnonymousNamedEntity<object>>();
+
+        private readonly Dictionary<Type, AnonymousNamedEntity<ResolveNodeBase>> _resolveTrees = new Dictionary<Type, AnonymousNamedEntity<ResolveNodeBase>>();
 
         private readonly object _lockObject = new object();
 
         private static readonly Lazy<IocContainer> LazyDefault = new Lazy<IocContainer>(() => new IocContainer());
-        public static IIocContainer Default
-        {
-            get { return LazyDefault.Value; }
-        }
+
+        public static IIocContainer Default => LazyDefault.Value;
 
         #region IIocContainer
 
@@ -31,7 +27,7 @@ namespace EasyIoc
             bool found;
             lock (_lockObject)
             {
-                found = _implementations.ContainsKey(interfaceType) || _factories.ContainsKey(interfaceType) || _instances.ContainsKey(interfaceType);
+                found = ContainsKey(_implementations, interfaceType) || ContainsKey(_instances, interfaceType);
             }
             return found;
         }
@@ -43,61 +39,53 @@ namespace EasyIoc
             Type interfaceType = typeof (TInterface);
 
             if (!interfaceType.IsInterface)
-                throw new ArgumentException("Cannot Register: Only an interface can be registered");
+                throw new ArgumentException("Cannot RegisterType: Only an interface can be registered");
 
             Type implementationType = typeof (TImplementation);
 
             if (implementationType.IsInterface || implementationType.IsAbstract)
-                throw new ArgumentException("Cannot Register: No interface or abstract class is valid as implementation");
+                throw new ArgumentException("Cannot RegisterType: No interface or abstract class is valid as implementation");
 
             if (!interfaceType.IsAssignableFrom(implementationType))
-                throw new ArgumentException(String.Format("{0} is not assignable from {1}", interfaceType.FullName, implementationType.FullName));
+                throw new ArgumentException($"Cannot RegisterType: {interfaceType.FullName} is not assignable from {implementationType.FullName}");
 
             lock (_lockObject)
             {
-                if (_factories.ContainsKey(interfaceType))
-                    throw new ArgumentException("Cannot Register: A factory has already been registered");
+                if (ContainsKey(_implementations, interfaceType))
+                    throw new ArgumentException($"Cannot RegisterType: An implementation has already been registered for interface {interfaceType.FullName}");
 
-                if (_instances.ContainsKey(interfaceType))
-                    throw new ArgumentException("Cannot Register: An instance has already been registered");
-
-                if (_implementations.ContainsKey(interfaceType))
-                {
-                    if (_implementations[interfaceType] != implementationType)
-                        throw new ArgumentException(String.Format("Cannot Register: An implementation has already been registered for interface {0}", interfaceType.FullName));
-                }
-                else
-                    _implementations.Add(interfaceType, implementationType);
+                UnsafeAdd(_implementations, interfaceType, implementationType);
                 // ResolveTree will be built on first call to Resolve
             }
         }
 
-        public void RegisterFactory<TInterface>(Func<TInterface> createFunc)
+        public void RegisterType<TInterface, TImplementation>(string name)
             where TInterface : class
+            where TImplementation : class, TInterface
         {
-            if (createFunc == null)
-                throw new ArgumentNullException("createFunc");
+            if (name == null)
+                throw new ArgumentNullException(nameof(name));
 
-            Type interfaceType = typeof (TInterface);
+            Type interfaceType = typeof(TInterface);
 
             if (!interfaceType.IsInterface)
-                throw new ArgumentException("Cannot RegisterFactory: Only an interface can be registered");
+                throw new ArgumentException("Cannot RegisterType: Only an interface can be registered");
+
+            Type implementationType = typeof(TImplementation);
+
+            if (implementationType.IsInterface || implementationType.IsAbstract)
+                throw new ArgumentException("Cannot RegisterType: No interface or abstract class is valid as implementation");
+
+            if (!interfaceType.IsAssignableFrom(implementationType))
+                throw new ArgumentException($"Cannot RegisterType: {interfaceType.FullName} is not assignable from {implementationType.FullName}");
 
             lock (_lockObject)
             {
-                if (_implementations.ContainsKey(interfaceType))
-                    throw new ArgumentException("Cannot RegisterFactory: An implementation has already been registered");
+                if (ContainsKey(_implementations, interfaceType, name))
+                    throw new ArgumentException($"Cannot RegisterType: An implementation has already been registered with that name for interface {interfaceType.FullName}");
 
-                if (_instances.ContainsKey(interfaceType))
-                    throw new ArgumentException("Cannot RegisterFactory: An instance has already been registered");
-
-                if (_factories.ContainsKey(interfaceType))
-                {
-                    if (_factories[interfaceType] != createFunc)
-                        throw new ArgumentException(String.Format("Cannot RegisterFactory: A factory has already been registered for interface {0}", interfaceType.FullName));
-                }
-                else
-                    _factories[interfaceType] = createFunc;
+                UnsafeAdd(_implementations, interfaceType, name, implementationType);
+                // ResolveTree will be built on first call to Resolve
             }
         }
 
@@ -105,7 +93,7 @@ namespace EasyIoc
             where TInterface : class
         {
             if (instance == null)
-                throw new ArgumentNullException("instance");
+                throw new ArgumentNullException(nameof(instance));
 
             Type interfaceType = typeof (TInterface);
 
@@ -114,19 +102,30 @@ namespace EasyIoc
 
             lock (_lockObject)
             {
-                if (_implementations.ContainsKey(interfaceType))
-                    throw new ArgumentException("Cannot RegisterFactory: An implementation has already been registered");
+                if (ContainsKey(_instances, interfaceType))
+                    throw new ArgumentException($"Cannot RegisterInstance: An instance has already been registered for interface {interfaceType.FullName}");
+                UnsafeAdd(_instances, interfaceType, instance);
+                // ResolveTree will be built on first call to Resolve
+            }
+        }
 
-                if (_factories.ContainsKey(interfaceType))
-                    throw new ArgumentException("Cannot RegisterInstance: A factory has already been registered");
+        public void RegisterInstance<TInterface>(TInterface instance, string instanceName)
+            where TInterface : class
+        {
+            if (instance == null)
+                throw new ArgumentNullException(nameof(instance));
 
-                if (_instances.ContainsKey(interfaceType))
-                {
-                    if (_instances[interfaceType] != instance)
-                        throw new ArgumentException(String.Format("Cannot RegisterInstance: An instance has already been registered for interface {0}", interfaceType.FullName));
-                }
-                else
-                    _instances.Add(interfaceType, instance);
+            Type interfaceType = typeof(TInterface);
+
+            if (!interfaceType.IsInterface)
+                throw new ArgumentException("Cannot RegisterInstance: Only an interface can be registered");
+
+            lock (_lockObject)
+            {
+                if (ContainsKey(_instances, interfaceType, instanceName))
+                    throw new ArgumentException($"Cannot RegisterInstance: An instance has already been registered for interface {interfaceType.FullName}");
+                UnsafeAdd(_instances, interfaceType, instanceName, instance);
+                // ResolveTree will be built on first call to Resolve
             }
         }
 
@@ -137,10 +136,10 @@ namespace EasyIoc
 
             lock (_lockObject)
             {
+                // remove anonymous and named
                 _implementations.Remove(interfaceType);
-                _factories.Remove(interfaceType);
                 _instances.Remove(interfaceType);
-                _resolveTrees.Remove(interfaceType);
+                _resolveTrees.Remove(interfaceType); // Force ResolveTree rebuild
             }
         }
 
@@ -150,19 +149,21 @@ namespace EasyIoc
             Type interfaceType = typeof (TInterface);
             lock (_lockObject)
             {
-                _implementations.Remove(interfaceType);
-                _resolveTrees.Remove(interfaceType); // Force ResolveTree rebuild
+                // remove anonymous only
+                Remove(_implementations, interfaceType);
+                Remove(_resolveTrees, interfaceType); // Force ResolveTree rebuild
             }
         }
 
-        public void UnregisterFactory<TInterface>()
+        public void UnregisterType<TInterface>(string name)
             where TInterface : class
         {
-            Type interfaceType = typeof (TInterface);
+            Type interfaceType = typeof(TInterface);
             lock (_lockObject)
             {
-                _factories.Remove(interfaceType);
-                _resolveTrees.Remove(interfaceType); // Force ResolveTree rebuild
+                // remove names only
+                Remove(_implementations, interfaceType, name);
+                Remove(_resolveTrees, interfaceType, name); // Force ResolveTree rebuild
             }
         }
 
@@ -172,14 +173,27 @@ namespace EasyIoc
             Type interfaceType = typeof (TInterface);
             lock (_lockObject)
             {
-                _instances.Remove(interfaceType);
-                _resolveTrees.Remove(interfaceType); // Force ResolveTree rebuild
+                // remove anonymous only
+                Remove(_instances, interfaceType);
+                Remove(_resolveTrees, interfaceType); // Force ResolveTree rebuild
+            }
+        }
+
+        public void UnregisterInstance<TInterface>(string instanceName)
+            where TInterface : class
+        {
+            Type interfaceType = typeof(TInterface);
+            lock (_lockObject)
+            {
+                // remove names only
+                Remove(_instances, interfaceType, instanceName);
+                Remove(_resolveTrees, interfaceType, instanceName); // Force ResolveTree rebuild
             }
         }
 
         public TInterface Resolve<TInterface>() where TInterface : class
         {
-            Type interfaceType = typeof (TInterface);
+            Type interfaceType = typeof(TInterface);
 
             if (!interfaceType.IsInterface)
                 throw new ArgumentException("Cannot Resolve: Only an interface can be resolved");
@@ -189,25 +203,25 @@ namespace EasyIoc
             lock (_lockObject)
             {
                 // Search in resolve tree cache
-                if (!_resolveTrees.TryGetValue(interfaceType, out resolveTree))
+                if (!TryGet(_resolveTrees, interfaceType, out resolveTree))
                 {
                     // Create resolve tree if not found
-                    resolveTree = BuildResolveTree(interfaceType);
+                    resolveTree = BuildResolveTree(interfaceType, null);
                     if (!(resolveTree is ErrorNode))
-                        _resolveTrees.Add(interfaceType, resolveTree); // save resolve tree only if not in error
+                        UnsafeAdd(_resolveTrees, interfaceType, resolveTree); // save resolve tree only if not in error
                 }
             }
             // Check errors
             if (resolveTree is ErrorNode)
             {
                 if (resolveTree == ErrorNode.TypeNotRegistered)
-                    throw new ArgumentException(String.Format("Cannot Resolve: No registration found for type {0}", interfaceType.FullName));
+                    throw new ArgumentException($"Cannot Resolve: No registration found for type {interfaceType.FullName}");
                 if (resolveTree == ErrorNode.NoPublicConstructorOrNoConstructor)
-                    throw new ArgumentException(String.Format("Cannot Resolve: No constructor or not public constructor for type {0}", interfaceType.FullName));
+                    throw new ArgumentException($"Cannot Resolve: No constructor or not public constructor for type {interfaceType.FullName}");
                 if (resolveTree == ErrorNode.NoResolvableConstructor)
-                    throw new ArgumentException(String.Format("Cannot Resolve: No resolvable constructor for type {0}", interfaceType.FullName));
+                    throw new ArgumentException($"Cannot Resolve: No resolvable constructor for type {interfaceType.FullName}");
                 if (resolveTree == ErrorNode.CyclicDependencyConstructor)
-                    throw new ArgumentException(String.Format("Cannot Resolve: Cyclic dependency detected for type {0}", interfaceType.FullName));
+                    throw new ArgumentException($"Cannot Resolve: Cyclic dependency detected for type {interfaceType.FullName}");
             }
             // Create instance
             try
@@ -218,12 +232,12 @@ namespace EasyIoc
             {
                 throw new InvalidOperationException("Cannot Resolve: See innerException", ex);
             }
-            return (TInterface) resolved;
+            return (TInterface)resolved;
         }
 
-        public TInterface Resolve<TInterface>(IEnumerable<ParameterValue> parameters) where TInterface : class
+        public TInterface Resolve<TInterface>(string name) where TInterface : class
         {
-            Type interfaceType = typeof (TInterface);
+            Type interfaceType = typeof(TInterface);
 
             if (!interfaceType.IsInterface)
                 throw new ArgumentException("Cannot Resolve: Only an interface can be resolved");
@@ -232,22 +246,26 @@ namespace EasyIoc
             ResolveNodeBase resolveTree;
             lock (_lockObject)
             {
-                // Don't search in resolve tree cache: ResolveTree may be different with or without parameters
-                // Create resolve tree
-                List<ParameterValue> parametersList = parameters == null ? null : parameters.ToList();
-                resolveTree = BuildResolveTree(interfaceType, parametersList);
+                // Search in resolve tree cache
+                if (!TryGet(_resolveTrees, interfaceType, out resolveTree))
+                {
+                    // Create resolve tree if not found
+                    resolveTree = BuildResolveTree(interfaceType, name);
+                    if (!(resolveTree is ErrorNode))
+                        UnsafeAdd(_resolveTrees, interfaceType, resolveTree); // save resolve tree only if not in error
+                }
             }
             // Check errors
             if (resolveTree is ErrorNode)
             {
                 if (resolveTree == ErrorNode.TypeNotRegistered)
-                    throw new ArgumentException(String.Format("Cannot Resolve: No registration found for type {0}", interfaceType.FullName));
+                    throw new ArgumentException($"Cannot Resolve: No registration found for type {interfaceType.FullName}");
                 if (resolveTree == ErrorNode.NoPublicConstructorOrNoConstructor)
-                    throw new ArgumentException(String.Format("Cannot Resolve: No constructor or not public constructor for type {0}", interfaceType.FullName));
+                    throw new ArgumentException($"Cannot Resolve: No constructor or not public constructor for type {interfaceType.FullName}");
                 if (resolveTree == ErrorNode.NoResolvableConstructor)
-                    throw new ArgumentException(String.Format("Cannot Resolve: No resolvable constructor for type {0}", interfaceType.FullName));
+                    throw new ArgumentException($"Cannot Resolve: No resolvable constructor for type {interfaceType.FullName}");
                 if (resolveTree == ErrorNode.CyclicDependencyConstructor)
-                    throw new ArgumentException(String.Format("Cannot Resolve: Cyclic dependency detected for type {0}", interfaceType.FullName));
+                    throw new ArgumentException($"Cannot Resolve: Cyclic dependency detected for type {interfaceType.FullName}");
             }
             // Create instance
             try
@@ -258,7 +276,7 @@ namespace EasyIoc
             {
                 throw new InvalidOperationException("Cannot Resolve: See innerException", ex);
             }
-            return (TInterface) resolved;
+            return (TInterface)resolved;
         }
 
         public void Reset()
@@ -266,13 +284,24 @@ namespace EasyIoc
             lock (_lockObject)
             {
                 _implementations.Clear();
-                _factories.Clear();
                 _instances.Clear();
                 _resolveTrees.Clear();
             }
         }
 
         #endregion
+
+        private class AnonymousNamedEntity<T>
+            where T:class
+        {
+            public T Anonymous { get; set; }
+            public Dictionary<string, T> Named { get; set; }
+
+            public AnonymousNamedEntity()
+            {
+                Named = new Dictionary<string, T>();
+            }
+        }
 
         // Following code is NOT responsible for locking collections
 
@@ -298,32 +327,6 @@ namespace EasyIoc
             }
         }
 
-        private sealed class ValueNode : ResolveNodeBase
-        {
-            public IParameterValue ParameterValue { private get; set; }
-
-            public override object Resolve()
-            {
-                if (ParameterValue == null)
-                    throw new InvalidOperationException("No parameter value");
-                return ParameterValue.Value;
-            }
-        }
-
-        private sealed class FactoryNode : ResolveNodeBase
-        {
-            public Func<object> Factory { private get; set; }
-
-            public override object Resolve()
-            {
-                if (Factory == null)
-                    throw new InvalidOperationException(String.Format("No factory for type {0}", InterfaceType.FullName));
-
-                object instance = Factory.DynamicInvoke(null);
-                return instance;
-            }
-        }
-
         private sealed class InstanceNode : ResolveNodeBase
         {
             public object Instance { private get; set; }
@@ -336,13 +339,13 @@ namespace EasyIoc
 
         private sealed class BuildableNode : ResolveNodeBase
         {
-            public ConstructorInfo ConstructorInfo { get; set; }
-            public List<ResolveNodeBase> Parameters { get; set; }
+            public ConstructorInfo ConstructorInfo { private get; set; }
+            public List<ResolveNodeBase> Parameters { private get; set; }
 
             public override object Resolve()
             {
                 if (ConstructorInfo == null)
-                    throw new InvalidOperationException(String.Format("No constructor info for type {0}", InterfaceType.FullName));
+                    throw new InvalidOperationException($"No constructor info for type {InterfaceType.FullName}");
 
                 // If parameterless, create instance
                 if (Parameters == null)
@@ -362,39 +365,32 @@ namespace EasyIoc
             }
         }
 
-        private ResolveNodeBase BuildResolveTree(Type interfaceType, List<ParameterValue> userDefinedParameters = null)
+        private ResolveNodeBase BuildResolveTree(Type interfaceType, string name)
         {
             List<Type> discoveredTypes = new List<Type>
             {
                 interfaceType
             };
-            return InnerBuildResolveTree(interfaceType, discoveredTypes, userDefinedParameters);
+            return InnerBuildResolveTree(interfaceType, name, discoveredTypes);
         }
 
-        private ResolveNodeBase InnerBuildResolveTree(Type interfaceType, ICollection<Type> discoveredTypes, List<ParameterValue> userDefinedParameters = null)
+        private ResolveNodeBase InnerBuildResolveTree(Type interfaceType, string name, ICollection<Type> discoveredTypes)
         {
-            // Factory ?
-            Func<object> factory;
-            if (_factories.TryGetValue(interfaceType, out factory))
-                return new FactoryNode
-                {
-                    InterfaceType = interfaceType,
-                    Factory = factory
-                };
-            // Instance ?
+            // Instance ? if found, return instance
             object instance;
-            if (_instances.TryGetValue(interfaceType, out instance))
+            if (TryGet(_instances, interfaceType, name, out instance))
                 return new InstanceNode
                 {
                     InterfaceType = interfaceType,
                     Instance = instance
                 };
 
-            // Implementation ?
+            // Implementation ? if found, we try to find a resolvable ctor
             Type implementationType;
-            if (!_implementations.TryGetValue(interfaceType, out implementationType))
+            if (!TryGet(_implementations, interfaceType, name, out implementationType))
                 return ErrorNode.TypeNotRegistered;
 
+            // We have found an implementation type matching interface type, let's the fun begin
             ConstructorInfo[] constructorInfos = implementationType.GetConstructors();
 
             // Valid constructor ?
@@ -409,7 +405,7 @@ namespace EasyIoc
                 Parameters = x.GetParameters()
             }).ToList();
 
-            // Get first parameterless if any
+            // Get first parameterless if any // TODO: we should get the first ctor matching user defined parameters
             var parameterless = constructorAndParameters.FirstOrDefault(x => x.Parameters.Length == 0);
             if (parameterless != null)
                 return new BuildableNode
@@ -427,35 +423,22 @@ namespace EasyIoc
                 bool ok = true;
                 foreach (ParameterInfo parameterInfo in c.Parameters)
                 {
-                    ParameterValue parameterValue = userDefinedParameters != null ? userDefinedParameters.FirstOrDefault(x => x.Name == parameterInfo.Name) : null;
-                    if (parameterValue != null)
+                    if (discoveredTypes.Any(x => x == parameterInfo.ParameterType)) // check cyclic dependency
                     {
-                        ValueNode parameter = new ValueNode
-                        {
-                            InterfaceType = null,
-                            ParameterValue = parameterValue
-                        };
-                        parametersResolvable.Add(parameter);
+                        ok = false;
+                        break;
                     }
-                    else
+
+                    discoveredTypes.Add(parameterInfo.ParameterType); // add parameter type to discovered type
+                    ResolveNodeBase parameter = InnerBuildResolveTree(parameterInfo.ParameterType, name, discoveredTypes);
+                    discoveredTypes.Remove(parameterInfo.ParameterType); // remove parameter type from discovered type
+
+                    if (parameter is ErrorNode) // once an invalid ctor parameter has been found, try next ctor
                     {
-                        if (discoveredTypes.Any(x => x == parameterInfo.ParameterType)) // check cyclic dependency
-                        {
-                            ok = false;
-                            break;
-                        }
-
-                        discoveredTypes.Add(parameterInfo.ParameterType); // add parameter type to discovered type
-                        ResolveNodeBase parameter = InnerBuildResolveTree(parameterInfo.ParameterType, discoveredTypes, userDefinedParameters);
-                        discoveredTypes.Remove(parameterInfo.ParameterType); // remove parameter type from discovered type
-
-                        if (parameter is ErrorNode) // once an invalid ctor parameter has been found, try next ctor
-                        {
-                            ok = false;
-                            break;
-                        }
-                        parametersResolvable.Add(parameter);
+                        ok = false;
+                        break;
                     }
+                    parametersResolvable.Add(parameter);
                 }
 
                 if (ok)
@@ -467,6 +450,77 @@ namespace EasyIoc
                     };
             }
             return ErrorNode.NoResolvableConstructor;
+        }
+
+        private bool ContainsKey<T>(IReadOnlyDictionary<Type, AnonymousNamedEntity<T>> dictionary, Type interfaceType, string name = null)
+            where T : class
+        {
+            AnonymousNamedEntity<T> entity;
+            if (!dictionary.TryGetValue(interfaceType, out entity))
+                return false;
+            if (name == null)
+                return entity.Anonymous != default(T);
+            return entity.Named.ContainsKey(name);
+        }
+
+        private bool TryGet<T>(IReadOnlyDictionary<Type, AnonymousNamedEntity<T>> dictionary, Type interfaceType, out T value)
+            where T : class
+        {
+            return TryGet(dictionary, interfaceType, null, out value);
+        }
+
+        private bool TryGet<T>(IReadOnlyDictionary<Type, AnonymousNamedEntity<T>> dictionary, Type interfaceType, string name, out T value)
+            where T:class
+        {
+            AnonymousNamedEntity<T> entity;
+            if (!dictionary.TryGetValue(interfaceType, out entity))
+            {
+                value = default(T);
+                return false;
+            }
+            if (name == null)
+            {
+                value = entity.Anonymous;
+                return value != default(T);
+            }
+            if (entity.Named.TryGetValue(name, out value))
+                return true;
+            return false;
+        }
+
+        private void UnsafeAdd<T>(Dictionary<Type, AnonymousNamedEntity<T>> dictionary, Type interfaceType, T value)
+            where T : class
+        {
+            UnsafeAdd(dictionary, interfaceType, null, value);
+        }
+
+        private void UnsafeAdd<T>(Dictionary<Type, AnonymousNamedEntity<T>> dictionary, Type interfaceType, string name, T value)
+            where T : class
+        {
+            AnonymousNamedEntity<T> entity;
+            if (!dictionary.TryGetValue(interfaceType, out entity))
+            {
+                entity = new AnonymousNamedEntity<T>();
+                dictionary.Add(interfaceType, entity);
+            }
+            if (name == null)
+                entity.Anonymous = value;
+            else
+                entity.Named[name] = value;
+        }
+
+        private bool Remove<T>(Dictionary<Type, AnonymousNamedEntity<T>> dictionary, Type interfaceType, string name = null)
+            where T : class
+        {
+            AnonymousNamedEntity<T> entity;
+            if (!dictionary.TryGetValue(interfaceType, out entity))
+                return false;
+            if (name == null)
+            {
+                entity.Anonymous = default(T);
+                return true;
+            }
+            return entity.Named.Remove(name);
         }
 
         #endregion

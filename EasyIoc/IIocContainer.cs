@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 
 namespace EasyIoc
 {
@@ -12,10 +11,14 @@ namespace EasyIoc
             where TInterface : class
             where TImplementation : class, TInterface;
 
-        void RegisterFactory<TInterface>(Func<TInterface> createFunc)
-            where TInterface : class;
+        void RegisterType<TInterface, TImplementation>(string name)
+            where TInterface : class
+            where TImplementation : class, TInterface;
 
         void RegisterInstance<TInterface>(TInterface instance)
+            where TInterface : class;
+
+        void RegisterInstance<TInterface>(TInterface instance, string instanceName)
             where TInterface : class;
 
         void Unregister<TInterface>()
@@ -24,16 +27,19 @@ namespace EasyIoc
         void UnregisterType<TInterface>()
             where TInterface : class;
 
-        void UnregisterFactory<TInterface>()
+        void UnregisterType<TInterface>(string name)
             where TInterface : class;
-        
+
         void UnregisterInstance<TInterface>()
+            where TInterface : class;
+
+        void UnregisterInstance<TInterface>(string instanceName)
             where TInterface : class;
 
         TInterface Resolve<TInterface>()
             where TInterface : class;
 
-        TInterface Resolve<TInterface>(IEnumerable<ParameterValue> parameters)
+        TInterface Resolve<TInterface>(string name)
             where TInterface : class;
 
         void Reset();
