@@ -1,11 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.329
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyIoc", "EasyIoc\EasyIoc.csproj", "{38D20E7F-9510-4B80-8755-1DEF2EF07BCF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyIocTest", "EasyIocTest\EasyIocTest.csproj", "{6B41B4BB-DEAD-44ED-AA65-783A8BDC3B6C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sample", "Sample\Sample.csproj", "{78B8BFBF-8EA7-4744-B752-E1DDD445AA64}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SinaC.IocContainer", "SinaC.IocContainer\SinaC.IocContainer.csproj", "{3BF23B4A-F37B-4B5D-AE0F-46E60F6B8854}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -25,8 +29,15 @@ Global
 		{78B8BFBF-8EA7-4744-B752-E1DDD445AA64}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{78B8BFBF-8EA7-4744-B752-E1DDD445AA64}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{78B8BFBF-8EA7-4744-B752-E1DDD445AA64}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3BF23B4A-F37B-4B5D-AE0F-46E60F6B8854}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3BF23B4A-F37B-4B5D-AE0F-46E60F6B8854}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3BF23B4A-F37B-4B5D-AE0F-46E60F6B8854}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3BF23B4A-F37B-4B5D-AE0F-46E60F6B8854}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B18E9387-2787-452D-9433-F8D9ECA2E1E8}
 	EndGlobalSection
 EndGlobal

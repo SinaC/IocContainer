@@ -20,7 +20,7 @@ namespace EasyIocTest
                 int value;
                 if (_countCall.TryGetValue(callId, out value))
                     return value;
-                return -1;
+                return 0;
             }
         }
 
@@ -188,6 +188,25 @@ namespace EasyIocTest
             CountCall.Increment("TestClass2ImplementingInterface3");
             Interface1 = interface1;
             Interface2 = interface2;
+        }
+    }
+
+    public class TestClass3ImplementingInterface3 : ITestInterface3
+    {
+        public ITestInterface1 Interface1 { get; private set; }
+        public ITestInterface2 Interface2 { get; private set; }
+
+        public TestClass3ImplementingInterface3(ITestInterface1 interface1, ITestInterface2 interface2)
+        {
+            CountCall.Increment("TestClass3ImplementingInterface3::cyclic");
+            Interface1 = interface1;
+            Interface2 = interface2;
+        }
+
+        public TestClass3ImplementingInterface3(ITestInterface1 interface1)
+        {
+            CountCall.Increment("TestClass3ImplementingInterface3::non-cyclic");
+            Interface1 = interface1;
         }
     }
 }

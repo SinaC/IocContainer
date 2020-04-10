@@ -1,0 +1,12 @@
+﻿multiple interface
+every test method on Resolve should be duplicated with TryResolve
+named+singleton
+multiple RegisterType on same interface but different implementation
+     multiple anonymous -> fail at register time
+     multiple named -> success if correct name specified
+     one anonymous + one named -> success if correct name specified
+     one anonymous + multiple named -> success if correct name specified
+multiple RegisterType on different interface on a single implementation
+test InitializeFromConfig(filename)
+
+add another unit test project with invalid RegisterType chain to validate exception on InitializeFromConfig without breaking other unit tests

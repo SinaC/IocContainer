@@ -1,0 +1,19 @@
+﻿Redo BuildableSingletonNode resolve
+
+Problem to check
+	a) Register type as Singleton
+	b) Register instance
+	c) Unregister instance
+	d) Unregister type
+	e) Resolve
+step order
+	a, e, c -> remove or not the instance ?
+	a, e, b -> exception because of multiple registered instance
+	b, a, e -> exception or not ?
+	a, e, d -> remove or not the instance ?
+	a, b, e -> return b or a new instance or exception ?
+	a, e, c -> remove or not the instance ?
+
+allow multiple registration on same interface
+	will fail if Resolve on this interface
+	will allow ResolveAll
